@@ -41,7 +41,7 @@ button{cursor:pointer}
 
 /* ---------- barre de marque ---------- */
 .brand{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
-.brand img{width:34px;height:34px}
+.brand img{width:34px;height:34px;border-radius:8px}
 .wm{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:.14em;line-height:1}
 .wm b{color:var(--blue);font-weight:800}
 .brand .who{font-size:12.5px;color:var(--muted)}

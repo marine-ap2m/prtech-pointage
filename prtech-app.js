@@ -165,6 +165,7 @@ function alerts(){
   S.chantiers.forEach(function(ch){var c=R.ch[ch.id];
     if(c.sansMarche&&c.faits>0)out.push({t:"r",ic:"!",h:ch.nom+" : pas de marché signé",s:"Créé par "+(ch.par||"Patrice")+" · "+jj(c.faits)+" ("+hh(c.h)+") chez "+clientOf(ch)+". Devis ou marché à faire."});
     if(c.depasse>0)out.push({t:"r",ic:"+",h:ch.nom+" : "+jj(c.depasse)+" au-delà du contrat",s:"Jours pointés non couverts. Un avenant est à prévoir."});
+    if(!c.sansMarche&&ch.debut<debutSuivi()&&!(ch.ant>0))out.push({t:"a",ic:"j",h:ch.nom+" a commencé le "+fd(ch.debut)+" : jours déjà faits ?",s:"Onglet « Clients, marchés & avenants » → « Déjà fait avant l'outil ». Sinon tout le chantier est planifié à partir d'aujourd'hui."});
   });
   var miss=[];for(var d=debutSuivi();d<TODAY;d=add(d,1))if(manque(d))miss.push(d);
   if(miss.length)out.push({t:"a",ic:"?",h:miss.length+" jour"+(miss.length>1?"s":"")+" ouvré"+(miss.length>1?"s":"")+" sans saisie",s:miss.slice(0,5).map(fd).join(", ")+(miss.length>5?"…":"")+" · à compléter par Patrice"});
