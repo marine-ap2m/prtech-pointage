@@ -1,0 +1,7 @@
+# Les contrats, factures et autres pièces ne partent jamais sur GitHub :
+# ils restent dans le Drive (PRTECH okok/3 - Contrats) ou ici en local.
+prtech-documents/
+*.pdf
+*.docx
+.DS_Store
+desktop.ini
