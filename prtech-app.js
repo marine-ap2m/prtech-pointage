@@ -470,7 +470,7 @@ function renderSheet(){
       });
       if(SH.rows.length<2)h+='<button class="addrow" data-act="addrow">+ J\'ai aussi été sur un autre chantier ce jour-là</button>';
     }else{
-      h+='<div class="note">Rien d'autre à remplir. Les chantiers prévus glissent tous au prochain jour ouvré.</div>';
+      h+='<div class="note">Rien à remplir de plus. Les chantiers prévus glissent tous au prochain jour ouvré.</div>';
     }
     if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
     h+='<div class="shf">'+(S.P[d]?'<button class="bs" data-act="clearday">Effacer</button>':'<button class="bs" data-act="close">Annuler</button>')+'<button class="bp" data-act="savesheet">Enregistrer</button></div>';
