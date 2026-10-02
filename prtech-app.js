@@ -126,7 +126,9 @@ function compute(){
       pos+=frac;faits+=frac;hours+=(+me.h);
       if(!first)first=d;last=d;
     });
-    var rest=total-pos, d=ch.debut>TODAY?ch.debut:TODAY, planned=[], guard=0;
+    // Le planning part de la vraie date de début : les jours passés non notés
+    // restent « prévus » (avec un ? à confirmer) tant que personne ne les a saisis.
+    var rest=total-pos, d=ch.debut, planned=[], guard=0;
     while(rest>1e-9 && guard<1500){
       if(ouvre(d) && !S.P[d] && !occ[d]){
         var f=Math.min(1,rest), bd2=lotAt(pos), l2=bd2&&bd2.l;
@@ -165,10 +167,9 @@ function alerts(){
   S.chantiers.forEach(function(ch){var c=R.ch[ch.id];
     if(c.sansMarche&&c.faits>0)out.push({t:"r",ic:"!",h:ch.nom+" : pas de marché signé",s:"Créé par "+(ch.par||"Patrice")+" · "+jj(c.faits)+" ("+hh(c.h)+") chez "+clientOf(ch)+". Devis ou marché à faire."});
     if(c.depasse>0)out.push({t:"r",ic:"+",h:ch.nom+" : "+jj(c.depasse)+" au-delà du contrat",s:"Jours pointés non couverts. Un avenant est à prévoir."});
-    if(!c.sansMarche&&ch.debut<debutSuivi()&&!(ch.ant>0))out.push({t:"a",ic:"j",h:ch.nom+" a commencé le "+fd(ch.debut)+" : jours déjà faits ?",s:"Onglet « Clients, marchés & avenants » → « Déjà fait avant l'outil ». Sinon tout le chantier est planifié à partir d'aujourd'hui."});
   });
   var miss=[];for(var d=debutSuivi();d<TODAY;d=add(d,1))if(manque(d))miss.push(d);
-  if(miss.length)out.push({t:"a",ic:"?",h:miss.length+" jour"+(miss.length>1?"s":"")+" ouvré"+(miss.length>1?"s":"")+" sans saisie",s:miss.slice(0,5).map(fd).join(", ")+(miss.length>5?"…":"")+" · à compléter par Patrice"});
+  if(miss.length)out.push({t:"a",ic:"?",h:miss.length+" jour"+(miss.length>1?"s":"")+" ouvré"+(miss.length>1?"s":"")+" à confirmer",s:"Depuis le "+fd(miss[0])+" · Patrice les remplit un par un (jours avec un ?)"});
   S.lots.forEach(function(l){var s=R.lot[l.id], ch=chById(l.ch), e=etat(l);if(!ch)return;
     if(e==="a")out.push({t:"a",ic:"€",h:ch.nom+" · "+lotName(l)+" terminé : à facturer",s:(s.au?"Terminé le "+fd(s.au)+" · ":"")+eur(montant(l).v)+" HT"});
     else if(e==="c"&&s.faits>0)out.push({t:"b",ic:"€",h:ch.nom+" · "+lotName(l)+" : facture à préparer",s:jj(s.faits)+" sur "+jj(+l.jours)+(s.au?" · se termine le "+fd(s.au):"")});
@@ -184,6 +185,7 @@ function alerts(){
 function lotEtatTxt(l){var s=R.lot[l.id];
   if(s.finit)return s.au?"terminé le "+fd(s.au):"terminé";
   if(s.faits>0)return jj(s.faits)+" faits, en cours";
+  if(s.du&&s.du<TODAY)return "prévu depuis le "+fd(s.du)+", jours pas encore confirmés";
   return "à venir"+(s.du?", à partir du "+fd(s.du):"");}
 function blocChantier(ch,o){
   var r=R.ch[ch.id], L=[];
@@ -353,8 +355,8 @@ function luiCal(){
     else if(bg.cls)cls+=" "+bg.cls;
     if(bg.list.length&&!(pp&&pp.abs)){var ns=bg.list.map(function(x){return court(chById(x.ch));});nm=ns[0]+(ns.length>1?"+"+(ns.length-1):"");}
     if(pp&&pp.it)lab=hh(pp.it.reduce(function(a,x){return a+(+x.h);},0)).replace(" ","");
-    h+='<button class="'+cls+'" style="'+(pp&&pp.abs||ms?"":bg.style)+'" data-act="open" data-d="'+d+'" aria-label="'+fdl(d)+(ms?", à remplir":"")+'">'
-      +'<span class="n">'+(+d.slice(8))+'</span>'+(ms?'<span class="q">?</span>':'<span class="nm">'+esc(nm)+'</span>')+'<span class="h">'+lab+'</span></button>';
+    h+='<button class="'+cls+'" style="'+(pp&&pp.abs||ms?"":bg.style)+'" data-act="open" data-d="'+d+'" aria-label="'+fdl(d)+(ms?", à confirmer":"")+'">'
+      +'<span class="n">'+(+d.slice(8))+'</span><span class="nm">'+esc(nm)+'</span>'+(ms?'<span class="q">?</span>':'<span class="h">'+lab+'</span>')+'</button>';
   });
   h+='</div><div class="legend"><span><i class="key k1"></i>Fait</span><span><i class="key k2"></i>Prévu</span><span><i class="key k3"></i>Pas travaillé</span><span><i class="key k4">?</i>À remplir</span></div></div>';
   var jt=0,ht=0;days.forEach(function(d){var pp=S.P[d];if(pp&&pp.it){jt++;ht+=pp.it.reduce(function(a,x){return a+(+x.h);},0);}});
