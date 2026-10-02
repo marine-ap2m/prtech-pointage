@@ -281,7 +281,8 @@ var VIEW="lui", LT="cal", TAB="planning", LM=TODAY.slice(0,7), AM=TODAY.slice(0,
 function monthDays(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7),n=new Date(Date.UTC(y,m,0)).getUTCDate(),a=[];for(var i=1;i<=n;i++)a.push(ym+"-"+pad(i));return a;}
 function shiftMonth(ym,k){var y=+ym.slice(0,4),m=+ym.slice(5,7)-1+k;y+=Math.floor(m/12);m=((m%12)+12)%12;return y+"-"+pad(m+1);}
 function monthLabel(ym){return MOIS[+ym.slice(5,7)-1]+" "+ym.slice(0,4);}
-var ABL={"Météo":"pluie","Malade":"malade","Congé":"congé","Perso":"perso","Autre":"autre"};
+var ABS="Pas travaillé";
+var ABL={"Pas travaillé":"repos","Météo":"pluie","Malade":"malade","Congé":"congé","Perso":"perso","Autre":"autre"};
 
 /* ================= squelette ================= */
 function squelette(){
@@ -333,7 +334,7 @@ function luiCal(){
   h+='<div class="carte"><div class="l">Aujourd\'hui · '+fdl(TODAY)+'</div>';
   if(p&&p.it){h+=p.it.map(function(i){var c=chById(i.ch);return '<div class="w"><span class="dot" style="background:'+(c?col(c):"#999")+'"></span>'+esc(c?c.nom:"?")+'<span class="muted" style="margin-left:auto;font-weight:700">'+hh(i.h)+'</span></div>';}).join("");
     h+='<button class="bs" data-act="open" data-d="'+TODAY+'">Modifier</button>';}
-  else if(p&&p.abs){h+='<div class="w">Pas travaillé · '+esc(p.abs)+'</div><button class="bs" data-act="open" data-d="'+TODAY+'">Modifier</button>';}
+  else if(p&&p.abs){h+='<div class="w">Pas travaillé'+(p.abs!==ABS?' · '+esc(p.abs):'')+'</div><button class="bs" data-act="open" data-d="'+TODAY+'">Modifier</button>';}
   else{var pv=td.filter(function(e){return e.kind==="prevu";})[0];
     if(pv){var c=chById(pv.ch);h+='<div class="w"><span class="dot" style="background:'+col(c)+'"></span>Prévu : '+esc(c.nom)+'</div>';}
     else h+='<div class="w muted">Rien de prévu</div>';
@@ -469,8 +470,7 @@ function renderSheet(){
       });
       if(SH.rows.length<2)h+='<button class="addrow" data-act="addrow">+ J\'ai aussi été sur un autre chantier ce jour-là</button>';
     }else{
-      h+='<div class="reasons">'+["Météo","Malade","Congé","Perso","Autre"].map(function(r){return '<button data-act="reason" data-k="'+r+'" aria-pressed="'+(SH.abs===r)+'">'+r+'</button>';}).join("")+'</div>';
-      h+='<div class="note">Perso = travaux pour vous, pas de client. Les chantiers prévus glissent tous au prochain jour ouvré.</div>';
+      h+='<div class="note">Rien d'autre à remplir. Les chantiers prévus glissent tous au prochain jour ouvré.</div>';
     }
     if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
     h+='<div class="shf">'+(S.P[d]?'<button class="bs" data-act="clearday">Effacer</button>':'<button class="bs" data-act="close">Annuler</button>')+'<button class="bp" data-act="savesheet">Enregistrer</button></div>';
@@ -491,7 +491,7 @@ function createChantierFromSheet(i){
 function saveSheet(){
   lireHeures();
   var d=SH.d, before=finsSnapshot();
-  if(SH.mode==="a"){if(!SH.abs){SH.err="Choisis une raison.";return renderSheet();}S.P[d]={abs:SH.abs};}
+  if(SH.mode==="a"){S.P[d]={abs:SH.abs||ABS};}
   else{
     if(SH.rows.some(function(r){return !r.ch;})){SH.err="Choisis un chantier pour chaque ligne.";return renderSheet();}
     if(SH.rows.some(function(r){return !(r.h>0)||r.h>16;})){SH.err="Indique des heures entre 0,5 et 16.";return renderSheet();}

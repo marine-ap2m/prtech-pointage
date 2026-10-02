@@ -1,5 +1,5 @@
 // PR.TECH · service worker : l'appli s'ouvre sans réseau, et reçoit le rappel de 20 h.
-const VERSION = "prtech-v2";
+const VERSION = "prtech-v3";
 const COQUILLE = [
   "./", "index.html", "prtech-style.css", "prtech-app.js", "prtech-manifest.webmanifest",
   "prtech-logo.png", "prtech-icon-192.png", "prtech-icon-512.png", "prtech-apple-180.png", "prtech-favicon.png",
