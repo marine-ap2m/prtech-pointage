@@ -428,6 +428,8 @@ function chantiersFor(d){
 }
 function renderSheet(){
   var h="";
+  if(SH.kind==="lot"){document.getElementById("sheet").innerHTML=feuilleLot();return;}
+  if(SH.kind==="ch"){document.getElementById("sheet").innerHTML=feuilleCh();return;}
   if(SH.kind==="etat"){
     var title=SH.sel.slice(0,3)==="ch:"?"État du chantier":"État du client";
     h+='<div class="shh"><div><div class="t">'+title+'</div><div class="s">PDF à l\'en-tête PR.TECH, ou texte à coller</div></div><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
@@ -558,45 +560,37 @@ function tPlanning(){
   return h;
 }
 
+function libFact(l){var e=etat(l);
+  if(e==="p")return "payé le "+fd(l.dp);
+  if(e==="f"||e==="r")return (l.nf?l.nf+" · ":"")+"échéance "+fd(echeance(l.df));
+  if(e==="a")return "terminé, à facturer";
+  return "facturé à la fin";}
 function tMarches(){
   var h="";
-  h+='<div class="card"><div class="chead"><h2>Clients et tarifs</h2><span class="muted" style="font-size:12.5px">visibles et modifiables par Patrice · prix par défaut des nouveaux marchés</span></div><div class="tw"><table><thead><tr><th class="l">Client</th><th class="l">Tarif</th><th>Montant HT</th><th class="l">Téléphone</th><th>Chantiers</th><th class="l"></th></tr></thead><tbody>';
+  h+='<div class="card"><div class="chead"><h2>Clients</h2><span class="muted" style="font-size:12.5px">tarifs visibles et modifiables par Patrice</span><span class="sp"></span><button class="bsm" data-act="newcl2">+ Nouveau client</button></div>';
   S.clients.forEach(function(cl){var n=S.chantiers.filter(function(c){return c.client===cl.id;}).length;
-    h+='<tr><td class="l"><input class="tx" id="cn-'+cl.id+'" data-chg="cl" data-cl="'+cl.id+'" data-k="nom" value="'+esc(cl.nom)+'"></td>'
-      +'<td class="l"><select id="cm-'+cl.id+'" data-chg="cl" data-cl="'+cl.id+'" data-k="mode"><option value="jour"'+(cl.mode==="jour"?" selected":"")+'>à la journée</option><option value="heure"'+(cl.mode==="heure"?" selected":"")+'>à l\'heure</option></select></td>'
-      +'<td><input type="number" min="0" id="ct-'+cl.id+'" data-chg="cl" data-cl="'+cl.id+'" data-k="tarif" value="'+cl.tarif+'"></td>'
-      +'<td class="l"><input class="nf" id="cp-'+cl.id+'" data-chg="cl" data-cl="'+cl.id+'" data-k="tel" value="'+esc(cl.tel||"")+'"></td>'
-      +'<td>'+n+'</td><td class="l">'+(cl.par&&cl.par!=="Marine"?'<span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</td></tr>';});
-  h+='</tbody></table></div></div>';
+    h+='<button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button>';});
+  h+='</div>';
   chOrder().forEach(function(c){var r=R.ch[c.id], lots=lotsOf(c.id), cl=clById(c.client)||{mode:"jour",tarif:0};
+    var tm=lots.reduce(function(a,l){return a+montant(l).v;},0);
     h+='<div class="card"><div class="chead"><span class="dot" style="background:'+col(c)+'"></span><h2>'+esc(c.nom)+'</h2><span class="muted">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span>'+(c.par&&c.par!=="Marine"?'<span class="badge b-a">créé par '+esc(c.par)+'</span>':'')+'<span class="sp"></span>'
-      +'<div class="chmeta"><label>Nom court <input id="co-'+c.id+'" data-chg="ch" data-ch="'+c.id+'" data-k="court" value="'+esc(c.court)+'" placeholder="'+esc(court(c))+'" style="width:96px"></label>'
-      +'<label>Début <input type="date" id="deb-'+c.id+'" data-chg="ch" data-ch="'+c.id+'" data-k="debut" value="'+c.debut+'"></label>'
-      +(r.sansMarche?'':'<label title="Jours déjà réalisés avant la mise en service de l\'outil">Déjà fait avant l\'outil <input type="number" min="0" step="0.5" id="ant-'+c.id+'" data-chg="ch" data-ch="'+c.id+'" data-k="ant" value="'+(c.ant||0)+'"> j</label><span>Fin prévue <b>'+fd(r.fin)+'</b></span><span><b>'+jj(Math.min(r.faits,r.total))+'</b> faits / '+jj(r.total)+'</span>')+'</div></div>';
+      +(r.sansMarche?'':'<span class="resume">'+jj(r.total)+' · <b>'+eur(tm)+'</b> · début '+fd(c.debut)+' · fin prévue <b>'+fd(r.fin)+'</b></span>')
+      +'<button class="bsm" data-act="editch" data-ch="'+c.id+'">Chantier</button></div>';
     if(r.sansMarche){
       h+='<div class="nolot"><span class="badge b-n">pas de marché signé</span><span>'+jj(r.faits)+' pointés ('+hh(r.h)+') · tarif client '+tarifTxt(cl.mode,cl.tarif)+'</span><span style="flex:1"></span><button class="bsm pri" data-act="mkmarche" data-ch="'+c.id+'">Créer le marché ('+jj(Math.max(1,Math.ceil(r.faits)))+')</button></div></div>';
       return;}
-    h+='<div class="tw"><table><thead><tr><th class="l">Contrat</th><th>Jours</th><th class="l">Tarif</th><th>Prix HT</th><th>Forfait HT</th><th>Montant</th><th>Fait</th><th class="l">Période</th><th class="l">Facturation</th><th class="l">N° facture</th><th class="l">Facturé le</th><th class="l">Échéance</th><th class="l">Payé le</th><th class="l">Bon de cde</th><th></th></tr></thead><tbody>';
-    lots.forEach(function(l){var s=R.lot[l.id], m=montant(l), e=etat(l);
-      h+='<tr><td class="l"><b>'+lotName(l)+'</b>'+(l.doc?'<span class="ps" title="'+esc(l.doc)+'">'+esc(l.doc.length>28?l.doc.slice(0,27)+"…":l.doc)+'</span>':'')+'</td>'
-        +'<td><input type="number" min="0.5" step="0.5" id="j-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="jours" value="'+l.jours+'"></td>'
-        +'<td class="l"><select id="m-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="mode"><option value="jour"'+(l.mode==="jour"?" selected":"")+'>/ jour</option><option value="heure"'+(l.mode==="heure"?" selected":"")+'>/ heure</option></select></td>'
-        +'<td><input type="number" min="0" step="1" id="p-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="prix" value="'+l.prix+'"></td>'
-        +'<td><input type="number" min="0" step="1" id="f-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="montant" value="'+(l.montant==null?"":l.montant)+'" placeholder="auto"></td>'
-        +'<td><b>'+eur(m.v)+'</b>'+(m.est?'<span class="ps">estimé à '+JH+' h/j</span>':'')+'</td>'
-        +'<td>'+jj(Math.min(s.faits,l.jours))+'<span class="ps">'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %'+(s.reprise?" · dont "+jj(s.reprise)+" avant":"")+'</span></td>'
-        +'<td class="l">'+(s.du?fd(s.du)+' → '+fd(s.au):'—')+'</td>'
-        +'<td class="l"><span class="badge b-'+e+'" style="margin-right:6px">'+STL[e]+'</span><select id="st-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="st"><option value="a"'+(l.st==="a"?" selected":"")+'>non facturé</option><option value="f"'+(l.st==="f"?" selected":"")+'>facturé</option><option value="p"'+(l.st==="p"?" selected":"")+'>payé</option></select></td>'
-        +'<td class="l"><input class="nf" id="nf-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="nf" value="'+esc(l.nf)+'" placeholder="F-2026-…"></td>'
-        +'<td class="l"><input type="date" id="df-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="df" value="'+(l.df||"")+'"></td>'
-        +'<td class="l">'+(l.df?fdy(echeance(l.df)):'—')+'</td>'
-        +'<td class="l"><input type="date" id="dp-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="dp" value="'+(l.dp||"")+'"></td>'
-        +'<td class="l"><input class="nf" id="rf-'+l.id+'" data-chg="lot" data-lot="'+l.id+'" data-k="ref" value="'+esc(l.ref)+'"></td>'
-        +'<td><button class="bsm danger" data-act="dellot" data-lot="'+l.id+'">'+(DELARM===l.id?"Confirmer":"Supprimer")+'</button></td></tr>';
+    h+='<div class="ct-h"><span>Contrat</span><span>Jours</span><span>Montant HT</span><span>Période</span><span>Fait</span><span>Facturation</span><span></span></div>';
+    lots.forEach(function(l){var s=R.lot[l.id], m=montant(l), e=etat(l), fa=Math.min(s.faits,l.jours);
+      h+='<button class="ct" data-act="editlot" data-lot="'+l.id+'">'
+        +'<span class="ct-n"><b>'+lotName(l)+'</b>'+(l.ref?'<small>'+esc(l.ref)+'</small>':'')+'</span>'
+        +'<span>'+jj(+l.jours)+'</span>'
+        +'<span><b>'+eur(m.v)+'</b>'+(m.est?'<small>estimé</small>':'')+'</span>'
+        +'<span class="muted">'+(s.du?fd(s.du)+' → '+fd(s.au):'—')+'</span>'
+        +'<span class="ct-f"><span class="mini"><i style="width:'+(fa/l.jours*100)+'%;background:'+col(c)+'"></i></span><small>'+jj(fa)+' / '+jj(+l.jours)+'</small></span>'
+        +'<span class="ct-s"><span class="badge b-'+e+'">'+STL[e]+'</span><small>'+esc(libFact(l))+'</small></span>'
+        +'<span class="go">›</span></button>';
     });
-    var tj=lots.reduce(function(a,l){return a+(+l.jours);},0), tm=lots.reduce(function(a,l){return a+montant(l).v;},0);
-    h+='<tr class="tot"><td class="l">Total chantier</td><td>'+jj(tj)+'</td><td></td><td></td><td></td><td>'+eur(tm)+'</td><td>'+jj(Math.min(r.faits,tj))+'</td><td colspan="8"></td></tr>';
-    h+='</tbody></table></div><div class="cfoot"><button class="bsm" data-act="addav" data-ch="'+c.id+'">+ Ajouter un avenant</button><span>L\'avenant ajoute des jours à la suite : tout le planning derrière glisse. Forfait HT vide = jours × prix.</span></div></div>';
+    h+='<div class="cfoot"><button class="bsm" data-act="addav" data-ch="'+c.id+'">+ Ajouter un avenant</button><span>Clique un contrat pour modifier ses jours, son montant ou sa facture.</span></div></div>';
   });
   h+='<div class="card"><div class="chead"><h2>Nouveau marché</h2><span class="muted" style="font-size:12.5px">un chantier, un nombre de jours, une date de début · le tarif du client est repris</span></div><form class="form" id="fnew">'
     +'<label>Client<select id="n-client">'+S.clients.map(function(c){return '<option value="'+c.id+'">'+esc(c.nom)+' · '+tarifTxt(c.mode,c.tarif)+'</option>';}).join("")+'<option value="new">+ Nouveau client…</option></select></label>'
@@ -608,6 +602,52 @@ function tMarches(){
     +'<label>Jours<input type="number" id="n-jours" min="0.5" step="0.5" value="10"></label>'
     +'<label>Forfait HT (si connu)<input type="number" id="n-montant" min="0" step="1" placeholder="auto"></label>'
     +'<div class="act"><button class="bp" type="submit">Créer le marché</button></div></form></div>';
+  return h;
+}
+
+/* fenêtre : un contrat */
+function feuilleLot(){
+  var l=lotById(SH.id), d=SH.dr, c=chById(l.ch), h="";
+  h+='<div class="shh"><div><div class="t">'+esc(c.nom)+' · '+lotName(l)+'</div><div class="s">'+(l.doc?esc(l.doc):'Pas de document rattaché')+'</div></div><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
+  h+='<div class="nc">'
+    +'<label>Jours<input id="lo-jours" type="number" min="0.5" step="0.5" value="'+d.jours+'"></label>'
+    +'<label>Tarif<select id="lo-mode"><option value="jour"'+(d.mode==="jour"?" selected":"")+'>à la journée</option><option value="heure"'+(d.mode==="heure"?" selected":"")+'>à l\'heure</option></select></label>'
+    +'<label>Prix HT (€)<input id="lo-prix" type="number" min="0" step="1" value="'+d.prix+'"></label>'
+    +'<label>Forfait HT (€)<input id="lo-montant" type="number" min="0" step="1" value="'+(d.montant==null?"":d.montant)+'" placeholder="vide = jours × prix"></label>'
+    +'<label class="full">Bon de commande<input id="lo-ref" value="'+esc(d.ref)+'" placeholder="ex. CF2605-080"></label></div>';
+  h+='<div class="lbl"><span>Facturation</span></div><div class="seg3">'
+    +[["a","Non facturé"],["f","Facturé"],["p","Payé"]].map(function(x){return '<button data-act="lst" data-k="'+x[0]+'" aria-pressed="'+(d.st===x[0])+'">'+x[1]+'</button>';}).join("")+'</div>';
+  if(d.st!=="a")h+='<div class="nc"><label>N° de facture<input id="lo-nf" value="'+esc(d.nf)+'" placeholder="F-2026-…"></label>'
+    +'<label>Facturé le<input id="lo-df" type="date" value="'+(d.df||"")+'"></label>'
+    +(d.st==="p"?'<label>Payé le<input id="lo-dp" type="date" value="'+(d.dp||"")+'"></label>':'')
+    +'<div class="note">Échéance 45 jours fin de mois : <b>'+(d.df?fdy(echeance(d.df)):"—")+'</b></div></div>';
+  if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
+  h+='<div class="shf"><button class="bs danger" data-act="dellot2">'+(SH.arme?"Confirmer la suppression":"Supprimer")+'</button><button class="bp" data-act="savelot">Enregistrer</button></div>';
+  return h;
+}
+function lireLot(){var d=SH.dr,g=function(id){var e=document.getElementById(id);return e?e.value.trim():null;};
+  var v;
+  if((v=g("lo-jours"))!=null)d.jours=parseFloat(v.replace(",","."));
+  if((v=g("lo-mode"))!=null)d.mode=v;
+  if((v=g("lo-prix"))!=null)d.prix=parseFloat(v.replace(",","."));
+  if((v=g("lo-montant"))!=null){var m=parseFloat(v.replace(",","."));d.montant=m>0?m:null;}
+  if((v=g("lo-ref"))!=null)d.ref=v;
+  if((v=g("lo-nf"))!=null)d.nf=v;
+  if((v=g("lo-df"))!=null)d.df=v;
+  if((v=g("lo-dp"))!=null)d.dp=v;}
+
+/* fenêtre : un chantier */
+function feuilleCh(){
+  var c=chById(SH.id), h="";
+  h+='<div class="shh"><div><div class="t">'+esc(c.nom)+'</div><div class="s">Le nom court s\'affiche dans le calendrier de Patrice</div></div><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
+  h+='<div class="nc"><label class="full">Nom<input id="ch-nom" value="'+esc(c.nom)+'"></label>'
+    +'<label>Nom court<input id="ch-court" maxlength="12" value="'+esc(c.court)+'" placeholder="'+esc(court(c))+'"></label>'
+    +'<label>Client<select id="ch-client">'+S.clients.map(function(x){return '<option value="'+x.id+'"'+(x.id===c.client?" selected":"")+'>'+esc(x.nom)+'</option>';}).join("")+'</select></label>'
+    +'<label>Ville<input id="ch-ville" value="'+esc(c.ville)+'"></label>'
+    +'<label>Début<input id="ch-debut" type="date" value="'+c.debut+'"></label>'
+    +'<label class="full">Adresse<input id="ch-adresse" value="'+esc(c.adresse)+'"></label></div>';
+  if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
+  h+='<div class="shf"><button class="bs" data-act="close">Annuler</button><button class="bp" data-act="savech">Enregistrer</button></div>';
   return h;
 }
 
@@ -655,14 +695,13 @@ function tRapport(){
   }
   S.clients.forEach(function(cl){var cc=chs.filter(function(c){return c.client===cl.id;});if(!cc.length)return;
     var t={m:0,f:0,p:0};
-    h+='<div class="card"><div class="chead"><h2>'+esc(cl.nom)+'</h2><span class="muted" style="font-size:12.5px">'+tarifTxt(cl.mode,cl.tarif)+'</span></div><div class="tw"><table><thead><tr><th class="l">Chantier · contrat</th><th>Jours</th><th>Montant</th><th>Fait</th><th class="l">Période</th><th class="l">Facture</th><th>Facturé</th><th class="l">Échéance</th><th>Payé</th><th>Reste à facturer</th><th>Reste à encaisser</th></tr></thead><tbody>';
+    h+='<div class="card"><div class="chead"><h2>'+esc(cl.nom)+'</h2><span class="muted" style="font-size:12.5px">'+tarifTxt(cl.mode,cl.tarif)+'</span></div><table class="fit"><thead><tr><th class="l">Chantier · contrat</th><th>Montant</th><th>Fait</th><th class="l">Facturation</th><th>Reste à facturer</th><th>Reste à encaisser</th></tr></thead><tbody>';
     cc.forEach(function(c){var r=R.ch[c.id];
-      if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché</td><td>'+jj(r.faits)+'</td><td>—</td><td>'+hh(r.h)+'</td><td class="l">'+(r.faits?fd(r.debut)+' → '+fd(r.fin):'—')+'</td><td class="l"><span class="badge b-n">devis à faire</span></td><td colspan="5"></td></tr>';return;}
-      lotsOf(c.id).forEach(function(l){var s=R.lot[l.id],m=montant(l).v,f=l.st!=="a"?m:0,p=l.st==="p"?m:0,e=etat(l);t.m+=m;t.f+=f;t.p+=p;
-      h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · '+lotName(l)+'</td><td>'+jj(+l.jours)+'</td><td>'+eur(m)+(montant(l).est?'<span class="ps">estimé</span>':'')+'</td><td>'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %</td>'
-        +'<td class="l">'+(s.du?fd(s.du)+' → '+fd(s.au):'—')+'</td><td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span> '+esc(l.nf||"")+'</td>'
-        +'<td>'+(f?eur(f)+'<span class="ps">'+fd(l.df)+'</span>':'—')+'</td><td class="l">'+(l.df?fdy(echeance(l.df)):'—')+'</td><td>'+(p?eur(p)+'<span class="ps">'+fd(l.dp)+'</span>':'—')+'</td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td></tr>';});});
-    h+='<tr class="tot"><td class="l">Total</td><td></td><td>'+eur(t.m)+'</td><td></td><td></td><td></td><td>'+eur(t.f)+'</td><td></td><td>'+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td></tr></tbody></table></div></div>';
+      if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché<span class="ps">'+jj(r.faits)+' · '+hh(r.h)+'</span></td><td>—</td><td>—</td><td class="l"><span class="badge b-n">devis à faire</span></td><td>—</td><td>—</td></tr>';return;}
+      lotsOf(c.id).forEach(function(l){var s=R.lot[l.id],mm=montant(l),m=mm.v,f=l.st!=="a"?m:0,p=l.st==="p"?m:0,e=etat(l);t.m+=m;t.f+=f;t.p+=p;
+      h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+jj(+l.jours)+(s.du?' · '+fd(s.du)+' → '+fd(s.au):'')+'</span></td><td>'+eur(m)+(mm.est?'<span class="ps">estimé</span>':'')+'</td><td>'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %</td>'
+        +'<td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span><span class="ps">'+esc(libFact(l))+'</span></td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td></tr>';});});
+    h+='<tr class="tot"><td class="l">Total</td><td>'+eur(t.m)+'</td><td></td><td class="l">facturé '+eur(t.f)+' · encaissé '+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td></tr></tbody></table></div>';
   });
   var gch=chOrder().filter(function(c){return ids.indexOf(c.id)>=0&&R.ch[c.id].fin;});
   if(gch.length){
@@ -670,8 +709,8 @@ function tRapport(){
     if(a<add(TODAY,-60))a=add(TODAY,-60);
     while(dow(a)!==0)a=add(a,-1);
     var cols=[];for(var d=a;d<=b||dow(d)!==0;d=add(d,1))if(dow(d)<5)cols.push(d);
-    h+='<div class="card"><div class="chead"><h2>Calendrier</h2><span class="muted" style="font-size:12.5px">jours ouvrés · plein = fait, clair = prévu · trait noir = aujourd\'hui</span></div><div class="gantt"><div class="gt" style="grid-template-columns:auto repeat('+cols.length+',12px)">';
-    h+='<div class="gl"></div>'+cols.map(function(d){return '<div class="gw">'+(dow(d)===0?fd(d):"")+'</div>';}).join("");
+    h+='<div class="card"><div class="chead"><h2>Calendrier</h2><span class="muted" style="font-size:12.5px">jours ouvrés · plein = fait, clair = prévu · trait noir = aujourd\'hui</span></div><div class="gantt"><div class="gt" style="grid-template-columns:auto repeat('+cols.length+',minmax(0,1fr))">';
+    h+='<div class="gl"></div>'+cols.map(function(d,k){var pas=cols.length>90?3:cols.length>45?2:1;return '<div class="gw">'+(dow(d)===0&&Math.floor(k/5)%pas===0?fd(d):"")+'</div>';}).join("");
     gch.forEach(function(c){
       h+='<div class="gl">'+esc(c.nom)+'<small>'+esc(clientOf(c))+'</small></div>';
       cols.forEach(function(d){var e=(R.days[d]||[]).filter(function(x){return x.ch===c.id;})[0], bg="var(--surface-2)";
@@ -715,11 +754,29 @@ document.addEventListener("click",function(e){
     S.lots.push(ml);sLot(ml);compute();toast("Marché créé pour "+ch.nom,"Ajuste les jours si le devis en prévoit plus : le planning suivra");return renderAll();}
   if(!SH&&a==="dellot"){if(DELARM!==b.dataset.lot){DELARM=b.dataset.lot;return renderMoi();}
     var id=b.dataset.lot;S.lots=S.lots.filter(function(l){return l.id!==id;});DELARM=null;pousser("prtech_contrat_supprimer",{p_jeton:JETON,p_id:id});return renderAll();}
+  if(a==="editlot"){var lo=lotById(b.dataset.lot);SH={kind:"lot",ctx:"moi",id:lo.id,dr:JSON.parse(JSON.stringify(lo)),err:"",arme:false};placeOv("moi");return renderSheet();}
+  if(a==="editch"){SH={kind:"ch",ctx:"moi",id:b.dataset.ch,err:""};placeOv("moi");return renderSheet();}
+  if(a==="editcl2")return openCl("moi",b.dataset.cl);
+  if(a==="newcl2")return openCl("moi",null);
   if(!SH)return;
   if(a==="close")return closeSheet();
   if(a==="eopt"){SH.o[b.dataset.k]=!SH.o[b.dataset.k];return renderSheet();}
   if(a==="copy")return copier(etatTexte(SH.sel,SH.o));
   if(a==="pdf")return envoyerPDF(SH.sel,SH.o);
+  if(a==="lst"){lireLot();var dr=SH.dr;dr.st=b.dataset.k;if(dr.st!=="a"&&!dr.df)dr.df=TODAY;if(dr.st==="p"&&!dr.dp)dr.dp=TODAY;SH.err="";return renderSheet();}
+  if(a==="savelot"){lireLot();var d2=SH.dr;
+    if(!(d2.jours>0)){SH.err="Indique un nombre de jours.";return renderSheet();}
+    if(!(d2.prix>=0)){SH.err="Indique un prix.";return renderSheet();}
+    if(d2.st==="a"){d2.df="";d2.dp="";}if(d2.st==="f")d2.dp="";
+    var lo2=lotById(SH.id),bfl=finsSnapshot();["jours","mode","prix","montant","ref","st","nf","df","dp"].forEach(function(k){lo2[k]=d2[k];});
+    sLot(lo2);return finish(bfl,lotName(lo2)+" enregistré");}
+  if(a==="dellot2"){if(!SH.arme){SH.arme=true;return renderSheet();}
+    var idl=SH.id,bfd=finsSnapshot();S.lots=S.lots.filter(function(l){return l.id!==idl;});pousser("prtech_contrat_supprimer",{p_jeton:JETON,p_id:idl});return finish(bfd,"Contrat supprimé");}
+  if(a==="savech"){var c3=chById(SH.id),nm3=val("ch-nom"),db3=val("ch-debut");
+    if(!nm3){SH.err="Donne un nom au chantier.";return renderSheet();}
+    if(!db3){SH.err="Indique la date de début.";return renderSheet();}
+    var bfc=finsSnapshot();c3.nom=nm3;c3.court=val("ch-court");c3.client=val("ch-client")||c3.client;c3.ville=val("ch-ville");c3.debut=db3;c3.adresse=val("ch-adresse");
+    sChantier(c3);return finish(bfc,c3.nom+" enregistré");}
   if(a==="savecl"){var nom=val("ncl-nom");if(!nom){SH.err="Donne un nom au client.";return renderSheet();}
     var edit=!!SH.id, c0=edit?clById(SH.id):{id:uid(),par:MOI.nom};
     c0.nom=nom;c0.mode=val("ncl-mode")||"jour";c0.tarif=parseFloat(val("ncl-tarif").replace(",","."))||0;c0.tel=val("ncl-tel");
