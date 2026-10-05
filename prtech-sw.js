@@ -1,5 +1,5 @@
 // PR.TECH · service worker : l'appli s'ouvre sans réseau, et reçoit le rappel de 20 h.
-const VERSION = "prtech-v6";
+const VERSION = "prtech-v7";
 const COQUILLE = [
   "./", "index.html", "prtech-style.css", "prtech-app.js", "prtech-manifest.webmanifest",
   "prtech-logo.png", "prtech-icon-192.png", "prtech-icon-512.png", "prtech-apple-180.png", "prtech-favicon.png",
@@ -15,13 +15,14 @@ self.addEventListener("activate", (e) => {
     .then(() => self.clients.claim()));
 });
 
-// Les fichiers de l'appli : réseau d'abord (pour avoir la dernière version), cache si pas de réseau.
+// Les fichiers de l'appli : réseau d'abord, sans passer par le cache du navigateur (sinon une mise à jour
+// peut attendre 10 minutes), cache de secours si pas de réseau.
 // Les données (Supabase) ne passent jamais par le cache.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request).then((rep) => {
+    fetch(e.request, { cache: "no-store" }).then((rep) => {
       const copie = rep.clone();
       caches.open(VERSION).then((c) => c.put(e.request, copie));
       return rep;

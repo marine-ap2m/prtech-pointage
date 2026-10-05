@@ -862,7 +862,14 @@ function demarrer(){
 (function(){
   var q=new URLSearchParams(location.search), k=q.get("k");
   if(k&&/^[0-9a-f-]{36}$/i.test(k)){JETON=k;lsSet("prtech_jeton",k);history.replaceState(null,"",location.pathname);}
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("prtech-sw.js").catch(function(){});
+  // Une nouvelle version de l'appli prend la main : la page se recharge seule (sauf saisie en cours).
+  if("serviceWorker" in navigator){
+    var avait=!!navigator.serviceWorker.controller, recharge=false;
+    navigator.serviceWorker.addEventListener("controllerchange",function(){if(avait&&!recharge&&!SH){recharge=true;location.reload();}});
+    navigator.serviceWorker.register("prtech-sw.js").then(function(reg){
+      document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")reg.update().catch(function(){});});
+    }).catch(function(){});
+  }
   document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&JETON&&S)recharger();});
   setInterval(function(){if(document.visibilityState==="visible"&&JETON&&S)recharger();},90000);
   if(!JETON)return ecranConnexion();
