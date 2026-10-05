@@ -37,7 +37,7 @@ function uid(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();re
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}}
 
-var PAL=["#1C9BE6","#3A4350","#E0761B","#2D8A5B","#7B4B94","#B0473A","#9A6414"];
+var PAL=["#1C9BE6","#2EA85F","#E0761B","#7B4B94","#B0473A","#9A6414","#C2578B"];
 function col(ch){return PAL[(ch.col||0)%PAL.length];}
 function tint(c){return c+"2E";}
 var STC={c:"#8A93A0",a:"#B45309",f:"#1C9BE6",r:"#B42318",p:"#1E7A4F",n:"#B42318"};
