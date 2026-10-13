@@ -347,3 +347,10 @@ table.fit td .ps{white-space:normal}
 .li.rs{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,.8fr) auto}
 .chc.rs{border-style:dashed;border-color:#8B5CF6}
 @media(max-width:820px){.li.rs{grid-template-columns:minmax(0,1fr) auto}.li.rs>span:nth-child(2),.li.rs>span:nth-child(4){display:none}}
+
+/* ---------- case « Déplacement » dans la journée ---------- */
+.dep{display:flex;align-items:center;gap:10px;width:100%;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:10px 12px;font-weight:700;font-size:14.5px;text-align:left}
+.dep .box{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);display:grid;place-items:center;font-size:15px;flex:none}
+.dep small{margin-left:auto;color:var(--muted);font-weight:600;font-size:13px}
+.dep[aria-pressed="true"]{border-color:var(--blue);background:var(--blue-pale)}
+.dep[aria-pressed="true"] .box{background:var(--blue);border-color:var(--blue);color:#04121C}

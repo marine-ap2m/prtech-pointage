@@ -75,23 +75,23 @@ function majAttente(){var el=document.getElementById("pend");if(!el)return;el.hi
 function appliquer(d){
   MOI=d.moi;
   S={
-    clients:(d.clients||[]).map(function(c){return {id:c.id,nom:c.nom,mode:c.mode,tarif:+c.tarif,tel:c.tel||"",par:c.cree_par};}),
+    clients:(d.clients||[]).map(function(c){return {id:c.id,nom:c.nom,mode:c.mode,tarif:+c.tarif,tel:c.tel||"",dep:+c.deplacement||0,par:c.cree_par};}),
     chantiers:(d.chantiers||[]).filter(function(c){return !c.archive;}).map(function(c){return {id:c.id,client:c.client_id,nom:c.nom,court:c.court||"",ville:c.ville||"",adresse:c.adresse||"",col:c.couleur||0,debut:c.debut,ant:+c.jours_anterieurs||0,par:c.cree_par};}),
     lots:(d.contrats||[]).map(function(l){return {id:l.id,ch:l.chantier_id,type:l.type,num:l.num,jours:+l.jours,mode:l.mode,prix:+l.prix,montant:l.montant==null?null:+l.montant,st:l.statut,nf:l.num_facture||"",df:l.date_facture||"",dp:l.date_paiement||"",ref:l.ref_commande||"",doc:l.document||""};}),
     P:{}, reg:d.reglages||{}
   };
   S.V={};(d.previsions||[]).forEach(function(v){S.V[v.jour]={serie:v.serie,client:v.client_id,lib:v.libelle||"",h:+v.heures};});
-  (d.journees||[]).forEach(function(j){S.P[j.jour]=j.absence?{abs:j.absence}:{it:(j.lignes||[]).map(function(x){return {ch:x.ch,h:+x.h};})};});
+  (d.journees||[]).forEach(function(j){S.P[j.jour]=j.absence?{abs:j.absence}:{it:(j.lignes||[]).map(function(x){return {ch:x.ch,h:+x.h,dep:!!x.dep};})};});
   // ce qui n'est pas encore parti (pas de réseau) reste visible
   OUT.forEach(function(o){if(o.fn==="prtech_journee_enregistrer"){var a=o.args;
-    if(a.p_absence)S.P[a.p_jour]={abs:a.p_absence};else if(a.p_lignes&&a.p_lignes.length)S.P[a.p_jour]={it:a.p_lignes.map(function(x){return {ch:x.ch,h:+x.h};})};else delete S.P[a.p_jour];}});
+    if(a.p_absence)S.P[a.p_jour]={abs:a.p_absence};else if(a.p_lignes&&a.p_lignes.length)S.P[a.p_jour]={it:a.p_lignes.map(function(x){return {ch:x.ch,h:+x.h,dep:!!x.dep};})};else delete S.P[a.p_jour];}});
   JH=+S.reg.JOURNEE_HEURES||8;
 }
 function charger(){return rpc("prtech_lire",{p_jeton:JETON}).then(function(d){lsSet("prtech_cache",JSON.stringify(d));appliquer(d);});}
 function recharger(){var ae=document.activeElement;if(SH||OUT.length||(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)))return;TODAY=aujourdhui();charger().then(renderAll,function(){});}
 
-function sJour(d){var p=S.P[d];return pousser("prtech_journee_enregistrer",{p_jeton:JETON,p_jour:d,p_absence:p&&p.abs||null,p_lignes:p&&p.it?p.it.map(function(x){return {ch:x.ch,h:x.h};}):[]});}
-function sClient(c){return pousser("prtech_client_enregistrer",{p_jeton:JETON,p:{id:c.id,nom:c.nom,mode:c.mode,tarif:c.tarif,tel:c.tel||null}});}
+function sJour(d){var p=S.P[d];return pousser("prtech_journee_enregistrer",{p_jeton:JETON,p_jour:d,p_absence:p&&p.abs||null,p_lignes:p&&p.it?p.it.map(function(x){return x.dep?{ch:x.ch,h:x.h,dep:true}:{ch:x.ch,h:x.h};}):[]});}
+function sClient(c){return pousser("prtech_client_enregistrer",{p_jeton:JETON,p:{id:c.id,nom:c.nom,mode:c.mode,tarif:c.tarif,tel:c.tel||null,deplacement:c.dep||0}});}
 function sChantier(c){return pousser("prtech_chantier_enregistrer",{p_jeton:JETON,p:{id:c.id,client_id:c.client,nom:c.nom,court:c.court||null,ville:c.ville||null,adresse:c.adresse||null,couleur:c.col,debut:c.debut,jours_anterieurs:c.ant||0,archive:false}});}
 function sLot(l){return pousser("prtech_contrat_enregistrer",{p_jeton:JETON,p:{id:l.id,chantier_id:l.ch,type:l.type,num:l.num,jours:l.jours,mode:l.mode,prix:l.prix,montant:l.montant==null?"":l.montant,statut:l.st,num_facture:l.nf,date_facture:l.df,date_paiement:l.dp,ref_commande:l.ref,document:l.doc}});}
 
@@ -125,7 +125,7 @@ function compute(){
       res.lot[l.id]={faits:0,h:0,reprise:0,prevus:0,du:null,au:null,finit:false};});
     function lotAt(pos){for(var i=0;i<bounds.length;i++)if(pos<bounds[i].b-1e-9)return bounds[i];return bounds[bounds.length-1]||null;}
     function mark(l,d){var s=res.lot[l.id];if(!s.du||d<s.du)s.du=d;if(!s.au||d>s.au)s.au=d;}
-    var pos=0, faits=0, hours=0, first=null, last=null;
+    var pos=0, faits=0, hours=0, first=null, last=null, deps=0;
     // jours faits avant la mise en service de l'outil
     var ant=Math.min(ch.ant||0,total||ch.ant||0);
     while(ant>1e-9&&lots.length){var bd=lotAt(pos),take=Math.min(ant,bd.b-pos);if(take<=1e-9)break;
@@ -136,7 +136,8 @@ function compute(){
       var sum=p.it.reduce(function(a,i){return a+(+i.h||0);},0);
       var frac=p.it.length>1&&sum>0?(+me.h)/sum:1;
       var bd=lotAt(pos), l=bd&&bd.l;
-      push(d,{ch:ch.id,lot:l&&l.id,kind:"fait",frac:frac,h:+me.h,over:lots.length>0&&pos>=total-1e-9});
+      push(d,{ch:ch.id,lot:l&&l.id,kind:"fait",frac:frac,h:+me.h,dep:!!me.dep,over:lots.length>0&&pos>=total-1e-9});
+      if(me.dep)deps++;
       if(l){res.lot[l.id].faits+=frac;res.lot[l.id].h+=(+me.h);mark(l,d);}
       pos+=frac;faits+=frac;hours+=(+me.h);
       if(!first)first=d;last=d;
@@ -155,7 +156,7 @@ function compute(){
       d=add(d,1);guard++;
     }
     lots.forEach(function(l){res.lot[l.id].finit=res.lot[l.id].faits>=(+l.jours)-1e-9;});
-    res.ch[ch.id]={total:total,faits:faits,h:hours,restants:Math.max(0,total-faits),depasse:lots.length?Math.max(0,faits-total):0,
+    res.ch[ch.id]={dep:deps,total:total,faits:faits,h:hours,restants:Math.max(0,total-faits),depasse:lots.length?Math.max(0,faits-total):0,
       sansMarche:!lots.length,debut:first||planned[0]||ch.debut,fin:planned.length?planned[planned.length-1]:last,planned:planned};
   });
   R=res;
@@ -163,6 +164,8 @@ function compute(){
 function finsSnapshot(){var o={};S.chantiers.forEach(function(c){o[c.id]=R.ch[c.id]&&R.ch[c.id].fin;});return o;}
 function diffFins(before){var m=[];chOrder().forEach(function(c){var a=before[c.id],b=R.ch[c.id].fin;if(a&&b&&a!==b)m.push(court(c)+" "+fd(a)+" → "+fd(b));});return m;}
 
+/* déplacements d'un chantier : nombre de jours cochés × forfait du client */
+function depCh(ch){var c=clById(ch.client),n=(R.ch[ch.id]&&R.ch[ch.id].dep)||0,pu=c?c.dep||0:0;return {n:n,pu:pu,v:n*pu};}
 function etat(l){var s=R.lot[l.id];
   if(l.st==="p")return "p";
   if(l.st==="f")return l.df&&echeance(l.df)<TODAY?"r":"f";
@@ -207,7 +210,7 @@ function lotEtatTxt(l){var s=R.lot[l.id];
 function blocChantier(ch,o){
   var r=R.ch[ch.id], L=[];
   L.push(ch.nom.toUpperCase()+(ch.ville?" · "+ch.ville:""));
-  if(r.sansMarche){L.push("Travaux sans devis signé : "+jj(r.faits)+" réalisés"+(r.faits?(r.debut===r.fin?" (le "+fd(r.debut)+")":" (du "+fd(r.debut)+" au "+fd(r.fin)+")"):""));if(o.h&&r.h>0)L.push("Heures réalisées : "+hh(r.h));return L;}
+  if(r.sansMarche){L.push("Travaux sans devis signé : "+jj(r.faits)+" réalisés"+(r.faits?(r.debut===r.fin?" (le "+fd(r.debut)+")":" (du "+fd(r.debut)+" au "+fd(r.fin)+")"):""));if(o.h&&r.h>0)L.push("Heures réalisées : "+hh(r.h));var dps=depCh(ch);if(o.f&&dps.n)L.push("Déplacements : "+dps.n+" × "+eur(dps.pu)+" = "+eur(dps.v)+" HT");return L;}
   lotsOf(ch.id).forEach(function(l){L.push("• "+lotName(l)+" : "+jj(+l.jours)+" · "+lotEtatTxt(l));});
   L.push("Total : "+jj(r.total)+" · "+jj(Math.min(r.faits,r.total))+" faits · "+jj(r.restants)+" restants");
   L.push(r.restants>0?"Fin prévue le "+fd(r.fin):"Chantier terminé"+(r.fin?" le "+fd(r.fin):""));
@@ -217,6 +220,7 @@ function blocChantier(ch,o){
     lotsOf(ch.id).forEach(function(l){var m=montant(l),e=etat(l);sg+=m.v;
       L.push("  "+lotName(l)+" : "+eur(m.v)+(m.est?" (estimé)":"")+" · "+(e==="p"?"payé le "+fd(l.dp):e==="f"||e==="r"?"facture "+(l.nf||"")+" du "+fd(l.df)+", échéance "+fdy(echeance(l.df)):e==="a"?"à facturer":"en cours"));
       if(e==="c"||e==="a")rf+=m.v; if(e==="f"||e==="r")rp+=m.v; if(e==="p")en+=m.v;});
+    var dpe=depCh(ch);if(dpe.n)L.push("  Déplacements : "+dpe.n+" × "+eur(dpe.pu)+" = "+eur(dpe.v)+" HT, en plus");
     L.push("Signé : "+eur(sg)+" · Encaissé : "+eur(en)+" · Reste à encaisser : "+eur(rp)+" · Reste à facturer : "+eur(rf));}
   return L;
 }
@@ -372,7 +376,7 @@ function luiCal(){
     else if(rv)cls+=" resa";
     else if(bg.cls)cls+=" "+bg.cls;
     if(bg.list.length&&!(pp&&pp.abs)){var ns=bg.list.map(function(x){return court(chById(x.ch));});nm=ns[0]+(ns.length>1?"+"+(ns.length-1):"");}
-    if(pp&&pp.it)lab=hh(pp.it.reduce(function(a,x){return a+(+x.h);},0)).replace(" ","");
+    if(pp&&pp.it)lab=hh(pp.it.reduce(function(a,x){return a+(+x.h);},0)).replace(" ","")+(pp.it.some(function(x){return x.dep;})?"+D":"");
     if(rv){nm=resaCourt(rv);lab=hh(rv.h).replace(" ","");}
     h+='<button class="'+cls+'" style="'+(pp&&pp.abs||ms||rv?"":bg.style)+'" data-act="open" data-d="'+d+'" aria-label="'+fdl(d)+(ms?", à confirmer":"")+'">'
       +'<span class="n">'+(+d.slice(8))+'</span><span class="nm">'+esc(nm)+'</span>'+(ms?'<span class="q">?</span>':'<span class="h">'+lab+'</span>')+'</button>';
@@ -415,7 +419,7 @@ function chCard(c){var r=R.ch[c.id], g=donnees(c.id), h="";
 function luiCls(){
   var h='<div class="ltop"><div class="t">Mes clients</div><div class="s">Tarifs, signé, facturé, encaissé</div></div><div class="sect" style="border-top:none"><div class="chl">';
   S.clients.forEach(function(cl){var chs=S.chantiers.filter(function(c){return c.client===cl.id;}), t=argentClient(cl.id);
-    h+='<div class="chc"><div class="top"><span class="nm">'+esc(cl.nom)+'</span><span class="tag2 t-neu">'+tarifTxt(cl.mode,cl.tarif)+'</span></div>'
+    h+='<div class="chc"><div class="top"><span class="nm">'+esc(cl.nom)+'</span><span class="tag2 t-neu">'+tarifTxt(cl.mode,cl.tarif)+(cl.dep?' + dépl. '+eur(cl.dep):'')+'</span></div>'
       +'<div class="cl">'+(chs.length?chs.map(function(c){return esc(c.nom);}).join(" · "):"aucun chantier")+(cl.tel?' · '+esc(cl.tel):'')+'</div>'
       +(t.sig?'<div class="money"><span>Signé<b>'+eur(t.sig)+'</b></span><span>Facturé<b>'+eur(t.fact)+'</b></span><span>Encaissé<b>'+eur(t.enc)+'</b></span><span class="due">Reste à encaisser<b>'+eur(t.fact-t.enc)+'</b></span></div>':'')
       +'<div class="acts"><button class="bs" data-act="editcl" data-cl="'+cl.id+'">Modifier</button>'+(chs.length?'<button class="bs" data-act="etat" data-sel="cl:'+cl.id+'">État du client</button>':'')+'</div></div>';});
@@ -431,7 +435,7 @@ function placeOv(ctx){var ov=document.getElementById("ov");
   ov.hidden=false;}
 function openSheet(d,ctx){
   var p=S.P[d], rows=[], abs=null, e=R.days[d]||[];
-  if(p&&p.it)rows=p.it.map(function(i){return {ch:i.ch,h:+i.h};});
+  if(p&&p.it)rows=p.it.map(function(i){return {ch:i.ch,h:+i.h,dep:!!i.dep};});
   else if(p&&p.abs)abs=p.abs;
   if(!rows.length){var pv=e.filter(function(x){return x.kind==="prevu";})[0];rows=[{ch:pv?pv.ch:null,h:JH}];}
   var rv=resa(d), planifie=e.some(function(x){return x.kind==="prevu";}), vv;
@@ -464,12 +468,13 @@ function renderSheet(){
     h+='<div class="shf"><button class="bs" data-act="copy">Copier le texte</button><button class="bp" data-act="pdf">Envoyer le PDF</button></div>';
   }
   else if(SH.kind==="cl"){
-    var cl=SH.id?clById(SH.id):{nom:"",mode:"jour",tarif:300,tel:""};
+    var cl=SH.id?clById(SH.id):{nom:"",mode:"jour",tarif:300,tel:"",dep:55};
     h+='<div class="shh"><div><div class="t">'+(SH.id?"Modifier le client":"Nouveau client")+'</div><div class="s">Visible aussi dans l\'outil de Marine</div></div><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
     h+='<div class="nc"><label class="full">Nom<input id="ncl-nom" value="'+esc(cl.nom)+'" placeholder="ex. SARL Toitures 33"></label>'
       +'<label>Tarif<select id="ncl-mode"><option value="jour"'+(cl.mode==="jour"?" selected":"")+'>à la journée</option><option value="heure"'+(cl.mode==="heure"?" selected":"")+'>à l\'heure</option></select></label>'
       +'<label>Montant HT (€)<input id="ncl-tarif" type="number" inputmode="decimal" min="0" step="1" value="'+cl.tarif+'"></label>'
-      +'<label class="full">Téléphone<input id="ncl-tel" inputmode="tel" value="'+esc(cl.tel||"")+'" placeholder="facultatif"></label></div>';
+      +'<label class="full">Téléphone<input id="ncl-tel" inputmode="tel" value="'+esc(cl.tel||"")+'" placeholder="facultatif"></label>'
+      +'<label class="full">Déplacement HT par jour (€) · mettre 0 si aucun<input id="ncl-dep" type="number" inputmode="decimal" min="0" step="1" value="'+(cl.dep==null?55:cl.dep)+'"></label></div>';
     if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
     h+='<div class="shf"><button class="bs" data-act="close">Annuler</button><button class="bp" data-act="savecl">Enregistrer</button></div>';
   }
@@ -497,7 +502,7 @@ function renderSheet(){
         }else h+='<button class="pk new" data-act="nc-open" data-i="'+i+'">+ Autre chantier (pas dans la liste)</button>';
         h+='</div><div class="lbl"><span>Heures</span></div><div class="step"><button data-act="hstep" data-i="'+i+'" data-k="-0.5" aria-label="Moins une demi-heure">−</button>'
           +'<input type="number" inputmode="decimal" step="0.5" min="0" max="16" id="hin-'+i+'" data-hin="'+i+'" value="'+r.h+'" aria-label="Heures"><span class="u">h</span>'
-          +'<button data-act="hstep" data-i="'+i+'" data-k="0.5" aria-label="Plus une demi-heure">+</button></div></div>';
+          +'<button data-act="hstep" data-i="'+i+'" data-k="0.5" aria-label="Plus une demi-heure">+</button></div>'+depBtn(r,i)+'</div>';
       });
       if(SH.rows.length<2)h+='<button class="addrow" data-act="addrow">+ J\'ai aussi été sur un autre chantier ce jour-là</button>';
     }else if(SH.mode==="v"){
@@ -520,13 +525,15 @@ function renderSheet(){
   }
   document.getElementById("sheet").innerHTML=h;
 }
+function depBtn(r,i){var c=r.ch&&chById(r.ch),cl=c&&clById(c.client);if(!cl||!(cl.dep>0))return "";
+  return '<button class="dep" data-act="dep" data-i="'+i+'" aria-pressed="'+(!!r.dep)+'"><span class="box">'+(r.dep?"✓":"")+'</span><span>Déplacement</span><small>'+eur(cl.dep)+'</small></button>';}
 function val(id){var e=document.getElementById(id);return e?e.value.trim():"";}
 function lireHeures(){if(!SH||SH.kind!=="day")return;SH.rows.forEach(function(r,i){var e=document.getElementById("hin-"+i);if(e){var v=parseFloat(String(e.value).replace(",","."));r.h=isNaN(v)?0:v;}});}
 function createChantierFromSheet(i){
   var cid=val("nc-client"), nom=val("nc-nom");
   if(!nom){SH.err="Donne un nom au chantier.";return renderSheet();}
   if(cid==="new"){var cn=val("nc-cnom");if(!cn){SH.err="Donne le nom du nouveau client.";return renderSheet();}
-    var ncl={id:uid(),nom:cn,mode:val("nc-mode")||"jour",tarif:parseFloat(val("nc-tarif"))||0,tel:"",par:MOI.nom};S.clients.push(ncl);sClient(ncl);cid=ncl.id;}
+    var ncl={id:uid(),nom:cn,mode:val("nc-mode")||"jour",tarif:parseFloat(val("nc-tarif"))||0,tel:"",dep:55,par:MOI.nom};S.clients.push(ncl);sClient(ncl);cid=ncl.id;}
   var ch={id:uid(),client:cid,nom:nom,court:"",ville:val("nc-ville"),adresse:"",col:S.chantiers.length%PAL.length,debut:SH.d,ant:0,par:MOI.nom};
   S.chantiers.push(ch);sChantier(ch);
   SH.rows[i].ch=ch.id;SH.nc=-1;SH.err="";compute();renderSheet();
@@ -536,7 +543,7 @@ function savePrev(){
   if(au<d){SH.err="La date de fin est avant le début.";return renderSheet();}
   if(!(hj>0)||hj>16){SH.err="Indique des heures entre 0,5 et 16.";return renderSheet();}
   if(cid==="new"){var cn=val("pv-cnom");if(!cn){SH.err="Donne le nom du nouveau client.";return renderSheet();}
-    var ncl={id:uid(),nom:cn,mode:"jour",tarif:300,tel:"",par:MOI.nom};S.clients.push(ncl);sClient(ncl);cid=ncl.id;}
+    var ncl={id:uid(),nom:cn,mode:"jour",tarif:300,tel:"",dep:55,par:MOI.nom};S.clients.push(ncl);sClient(ncl);cid=ncl.id;}
   if(!cid){SH.err="Choisis un client.";return renderSheet();}
   var jours=[],x=d,garde=0;
   while(x<=au&&garde<200){if(ouvre(x)&&!S.P[x])jours.push(x);x=add(x,1);garde++;}
@@ -560,7 +567,7 @@ function saveSheet(){
     if(SH.rows.some(function(r){return !r.ch;})){SH.err="Choisis un chantier pour chaque ligne.";return renderSheet();}
     if(SH.rows.some(function(r){return !(r.h>0)||r.h>16;})){SH.err="Indique des heures entre 0,5 et 16.";return renderSheet();}
     var seen={};if(SH.rows.some(function(r){if(seen[r.ch])return true;seen[r.ch]=1;})){SH.err="Le même chantier est choisi deux fois.";return renderSheet();}
-    S.P[d]={it:SH.rows.map(function(r){return {ch:r.ch,h:Math.round(r.h*2)/2};})};}
+    S.P[d]={it:SH.rows.map(function(r){return {ch:r.ch,h:Math.round(r.h*2)/2,dep:!!r.dep};})};}
   delete S.V[d];
   sJour(d);
   finish(before,"Journée du "+fd(d)+" enregistrée");
@@ -594,7 +601,7 @@ function tPlanning(){
     e.forEach(function(x){var c=chById(x.ch), l=x.lot?lotById(x.lot):null, cc=barColor(c,l);
       var sm=l?(MODE==="fa"?lotShort(l)+" · "+STL[etat(l)]:lotShort(l)):"sans marché";
       var lab=esc(c.nom)+' <small>'+sm+(x.over?" · hors contrat":"")+'</small>';
-      if(x.kind==="fait")h+='<span class="bar" style="background:'+(x.over||!l?"var(--red)":cc)+'">'+lab+(pp.it.length>1?' <small>'+hh(x.h)+'</small>':'')+'</span>';
+      if(x.kind==="fait")h+='<span class="bar" style="background:'+(x.over||!l?"var(--red)":cc)+'">'+lab+(pp.it.length>1?' <small>'+hh(x.h)+'</small>':'')+(x.dep?' <small>· dépl.</small>':'')+'</span>';
       else h+='<span class="bar pv" style="background:'+tint(cc)+';box-shadow:inset 3px 0 0 '+cc+'">'+lab+'</span>';
     });
     var rvm=resa(d);if(rvm)h+='<span class="bar rsv">Réservé · '+esc(resaNom(rvm))+' <small>'+esc(resaClient(rvm))+' · '+hh(rvm.h)+'</small></span>';
@@ -631,7 +638,7 @@ function tMarches(){
   var h="";
   h+='<div class="card"><div class="chead"><h2>Clients</h2><span class="muted" style="font-size:12.5px">tarifs visibles et modifiables par Patrice</span><span class="sp"></span><button class="bsm" data-act="newcl2">+ Nouveau client</button></div>';
   S.clients.forEach(function(cl){var n=S.chantiers.filter(function(c){return c.client===cl.id;}).length;
-    h+='<button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button>';});
+    h+='<button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+(cl.dep?' · dépl. '+eur(cl.dep):'')+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button>';});
   h+='</div>';
   var sr=series();
   if(sr.length){h+='<div class="card"><div class="chead"><h2>Jours réservés, sans contrat</h2><span class="muted" style="font-size:12.5px">notés à l\'avance par Patrice · à transformer en marché quand le devis est signé</span></div>';
@@ -641,6 +648,7 @@ function tMarches(){
   chOrder().forEach(function(c){var r=R.ch[c.id], lots=lotsOf(c.id), cl=clById(c.client)||{mode:"jour",tarif:0};
     var tm=lots.reduce(function(a,l){return a+montant(l).v;},0);
     h+='<div class="card"><div class="chead"><span class="dot" style="background:'+col(c)+'"></span><h2>'+esc(c.nom)+'</h2><span class="muted">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span>'+(c.par&&c.par!=="Marine"?'<span class="badge b-a">créé par '+esc(c.par)+'</span>':'')+'<span class="sp"></span>'
+      +(function(){var dp=depCh(c);return dp.n?'<span class="resume">déplacements '+dp.n+' × '+eur(dp.pu)+' = <b>'+eur(dp.v)+'</b></span>':'';})()
       +(r.sansMarche?'':'<span class="resume">'+jj(r.total)+' · <b>'+eur(tm)+'</b> · début '+fd(c.debut)+' · fin prévue <b>'+fd(r.fin)+'</b></span>')
       +'<button class="bsm" data-act="editch" data-ch="'+c.id+'">Chantier</button></div>';
     if(r.sansMarche){
@@ -764,10 +772,11 @@ function tRapport(){
     var t={m:0,f:0,p:0};
     h+='<div class="card"><div class="chead"><h2>'+esc(cl.nom)+'</h2><span class="muted" style="font-size:12.5px">'+tarifTxt(cl.mode,cl.tarif)+'</span></div><table class="fit"><thead><tr><th class="l">Chantier · contrat</th><th>Montant</th><th>Fait</th><th class="l">Facturation</th><th>Reste à facturer</th><th>Reste à encaisser</th></tr></thead><tbody>';
     cc.forEach(function(c){var r=R.ch[c.id];
-      if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché<span class="ps">'+jj(r.faits)+' · '+hh(r.h)+'</span></td><td>—</td><td>—</td><td class="l"><span class="badge b-n">devis à faire</span></td><td>—</td><td>—</td></tr>';return;}
+      if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché<span class="ps">'+jj(r.faits)+' · '+hh(r.h)+(depCh(c).n?' · déplacements '+depCh(c).n+' × '+eur(depCh(c).pu)+' = '+eur(depCh(c).v):'')+'</span></td><td>—</td><td>—</td><td class="l"><span class="badge b-n">devis à faire</span></td><td>—</td><td>—</td></tr>';return;}
       lotsOf(c.id).forEach(function(l){var s=R.lot[l.id],mm=montant(l),m=mm.v,f=l.st!=="a"?m:0,p=l.st==="p"?m:0,e=etat(l);t.m+=m;t.f+=f;t.p+=p;
       h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+jj(+l.jours)+(s.du?' · '+fd(s.du)+' → '+fd(s.au):'')+'</span></td><td>'+eur(m)+(mm.est?'<span class="ps">estimé</span>':'')+'</td><td>'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %</td>'
-        +'<td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span><span class="ps">'+esc(libFact(l))+'</span></td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td></tr>';});});
+        +'<td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span><span class="ps">'+esc(libFact(l))+'</span></td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td></tr>';});
+      var dpr=depCh(c);if(dpr.n)h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · Déplacements<span class="ps">'+dpr.n+' × '+eur(dpr.pu)+'</span></td><td>'+eur(dpr.v)+'</td><td></td><td class="l"><span class="ps">en plus du marché, à ajouter à la facture</span></td><td></td><td></td></tr>';});
     h+='<tr class="tot"><td class="l">Total</td><td>'+eur(t.m)+'</td><td></td><td class="l">facturé '+eur(t.f)+' · encaissé '+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td></tr></tbody></table></div>';
   });
   var gch=chOrder().filter(function(c){return ids.indexOf(c.id)>=0&&R.ch[c.id].fin;});
@@ -853,13 +862,14 @@ document.addEventListener("click",function(e){
     sChantier(c3);return finish(bfc,c3.nom+" enregistré");}
   if(a==="savecl"){var nom=val("ncl-nom");if(!nom){SH.err="Donne un nom au client.";return renderSheet();}
     var edit=!!SH.id, c0=edit?clById(SH.id):{id:uid(),par:MOI.nom};
-    c0.nom=nom;c0.mode=val("ncl-mode")||"jour";c0.tarif=parseFloat(val("ncl-tarif").replace(",","."))||0;c0.tel=val("ncl-tel");
+    c0.nom=nom;c0.mode=val("ncl-mode")||"jour";c0.tarif=parseFloat(val("ncl-tarif").replace(",","."))||0;c0.tel=val("ncl-tel");c0.dep=parseFloat(val("ncl-dep").replace(",","."))||0;
     if(!edit)S.clients.push(c0);sClient(c0);
     closeSheet();toast(edit?"Client modifié":"Client enregistré : "+nom,MOI.role==="artisan"?"Marine le voit dans son outil":"Patrice le voit sur son téléphone");return renderAll();}
   if(a==="mode"){lireHeures();SH.mode=b.dataset.k;SH.err="";return renderSheet();}
   if(a==="delv1"){var bv=finsSnapshot(),dv=SH.d;delete S.V[dv];dPrev([dv]);return finish(bv,"Réservation du "+fd(dv)+" retirée");}
   if(a==="delvs"){var bv2=finsSnapshot(),sv=SH.v.serie,js2=Object.keys(S.V).filter(function(k){return S.V[k].serie===sv;});js2.forEach(function(k){delete S.V[k];});dPrev(js2);return finish(bv2,js2.length+" jours réservés retirés");}
-  if(a==="pick"){lireHeures();SH.rows[i].ch=b.dataset.ch;SH.err="";return renderSheet();}
+  if(a==="pick"){lireHeures();if(SH.rows[i].ch!==b.dataset.ch)SH.rows[i].dep=false;SH.rows[i].ch=b.dataset.ch;SH.err="";return renderSheet();}
+  if(a==="dep"){lireHeures();SH.rows[i].dep=!SH.rows[i].dep;return renderSheet();}
   if(a==="nc-open"){lireHeures();SH.nc=i;return renderSheet();}
   if(a==="nc-create"){lireHeures();return createChantierFromSheet(i);}
   if(a==="hstep"){lireHeures();SH.rows[i].h=Math.max(0.5,Math.min(16,(SH.rows[i].h||0)+(+b.dataset.k)));var inp=document.getElementById("hin-"+i);if(inp)inp.value=SH.rows[i].h;return;}
@@ -904,7 +914,7 @@ document.addEventListener("submit",function(e){
   if(e.target.id!=="fnew")return;e.preventDefault();
   var cid=val("n-client"), cn=val("n-cnom"), nom=val("n-nom");
   if(!nom)return toast("Nom du chantier manquant","Remplis « Chantier »");
-  if(cid==="new"){if(!cn)return toast("Nom du client manquant","Remplis « Nouveau client »");var nc={id:uid(),nom:cn,mode:"jour",tarif:300,tel:"",par:MOI.nom};S.clients.push(nc);sClient(nc);cid=nc.id;}
+  if(cid==="new"){if(!cn)return toast("Nom du client manquant","Remplis « Nouveau client »");var nc={id:uid(),nom:cn,mode:"jour",tarif:300,tel:"",dep:55,par:MOI.nom};S.clients.push(nc);sClient(nc);cid=nc.id;}
   var cl=clById(cid), before=finsSnapshot();
   var ch={id:uid(),client:cid,nom:nom,court:val("n-court"),ville:val("n-ville"),adresse:"",col:S.chantiers.length%PAL.length,debut:val("n-debut")||TODAY,ant:0,par:MOI.nom};
   S.chantiers.push(ch);sChantier(ch);
