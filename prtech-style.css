@@ -337,3 +337,13 @@ table.fit td,table.fit th{white-space:normal}
 table.fit td .ps{white-space:normal}
 .gantt{overflow:hidden}
 .gw{overflow:visible;white-space:nowrap}
+
+/* ---------- jours réservés à l'avance (prévisionnel) : violet hachuré ---------- */
+.mc.resa{background:repeating-linear-gradient(135deg,#8B5CF64D 0 6px,#8B5CF61A 6px 12px);border:1.5px dashed #8B5CF6}
+.key.k5{background:repeating-linear-gradient(135deg,#8B5CF699 0 3px,#8B5CF626 3px 6px);border:1px dashed #8B5CF6}
+.bar.rsv{background:repeating-linear-gradient(135deg,#8B5CF64D 0 6px,#8B5CF61A 6px 12px);color:var(--ink);font-weight:600;box-shadow:inset 3px 0 0 #8B5CF6}
+.seg.s3{grid-template-columns:repeat(3,1fr)}
+.seg.s3 button{font-size:13px;padding:9px 4px}
+.li.rs{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1.3fr) minmax(0,.8fr) auto}
+.chc.rs{border-style:dashed;border-color:#8B5CF6}
+@media(max-width:820px){.li.rs{grid-template-columns:minmax(0,1fr) auto}.li.rs>span:nth-child(2),.li.rs>span:nth-child(4){display:none}}
