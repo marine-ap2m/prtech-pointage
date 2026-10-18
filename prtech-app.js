@@ -489,7 +489,8 @@ function feuillePerso(){var d=SH.dr,h="";
     +'<label class="full">Note (facultatif)<input id="pp-note" value="'+esc(d.note||"")+'"></label>'
     +'<div class="note">'+(d.fixe?'Ces jours sont bloqués, week-ends compris. Les chantiers se décalent autour.':'Se cale comme un chantier, samedi et dimanche compris. Les chantiers avancent ou reculent autour.')+'</div></div>';
   if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
-  h+='<div class="shf">'+(SH.id?'<button class="bs danger" data-act="delperso">'+(SH.arme?"Confirmer":"Supprimer")+'</button>':'<button class="bs" data-act="close">Annuler</button>')+'<button class="bp" data-act="saveperso">Enregistrer</button></div>';
+  if(SH.arme){var fp=R.ch[SH.id]?R.ch[SH.id].faits:0;h+='<div class="err">'+(fp>0?jj(fp)+' déjà faits restent notés. La suite est retirée et les chantiers se recalent.':'La tâche est retirée et les chantiers se recalent.')+'</div>';}
+  h+='<div class="shf">'+(SH.id?'<button class="bs danger" data-act="delperso">'+(SH.arme?"Confirmer l'annulation":"Annuler la tâche")+'</button>':'<button class="bs" data-act="close">Annuler</button>')+'<button class="bp" data-act="saveperso">Enregistrer</button></div>';
   return h;}
 function savePerso(){lirePerso();var d=SH.dr;
   if(!d.nom){SH.err="Dis ce que c'est.";return renderSheet();}
@@ -931,9 +932,15 @@ document.addEventListener("click",function(e){
   if(a==="pick"){lireHeures();if(SH.rows[i].ch!==b.dataset.ch)SH.rows[i].dep=false;SH.rows[i].ch=b.dataset.ch;SH.err="";return renderSheet();}
   if(a==="pmode"){lirePerso();SH.dr.fixe=b.dataset.k==="fixe";if(SH.dr.fixe&&SH.dr.au<SH.dr.du)SH.dr.au=SH.dr.du;SH.err="";return renderSheet();}
   if(a==="saveperso")return savePerso();
-  if(a==="delperso"){var cp=chById(SH.id);if(R.ch[cp.id].faits>0){SH.err="Des journées sont déjà notées dessus : efface-les d'abord.";return renderSheet();}
+  if(a==="delperso"){var cp=chById(SH.id),fp0=R.ch[cp.id].faits;
     if(!SH.arme){SH.arme=true;return renderSheet();}
-    var bp0=finsSnapshot();cp.archive=true;sChantier(cp);S.chantiers=S.chantiers.filter(function(x){return x.id!==cp.id;});return finish(bp0,"Tâche perso supprimée");}
+    var bp0=finsSnapshot();
+    if(fp0>0){
+      // des jours sont déjà faits : on les garde, on retire seulement la suite
+      var faitsJ=Object.keys(S.P).filter(function(k){return S.P[k].it&&S.P[k].it.some(function(x){return x.ch===cp.id;});}).sort();
+      if(cp.fixe)cp.fin=faitsJ[faitsJ.length-1];else cp.jp=Math.round(fp0*2)/2;
+      sChantier(cp);return finish(bp0,"Tâche perso arrêtée : "+jj(fp0)+(fp0>1?" gardés":" gardé")+", la suite est retirée");}
+    cp.archive=true;sChantier(cp);S.chantiers=S.chantiers.filter(function(x){return x.id!==cp.id;});return finish(bp0,"Tâche perso annulée");}
   if(a==="dep"){lireHeures();SH.rows[i].dep=!SH.rows[i].dep;return renderSheet();}
   if(a==="nc-open"){lireHeures();SH.nc=i;return renderSheet();}
   if(a==="nc-create"){lireHeures();return createChantierFromSheet(i);}
