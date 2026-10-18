@@ -38,7 +38,8 @@ function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}}
 
 var PAL=["#1C9BE6","#2EA85F","#E0761B","#7B4B94","#B0473A","#9A6414","#C2578B"];
-function col(ch){return PAL[(ch.col||0)%PAL.length];}
+var PERSO="#F5A524";
+function col(ch){if(ch&&ch.perso)return PERSO;return PAL[(ch.col||0)%PAL.length];}
 function tint(c){return c+"2E";}
 var STC={c:"#8A93A0",a:"#B45309",f:"#1C9BE6",r:"#B42318",p:"#1E7A4F",n:"#B42318"};
 var STL={c:"en cours",a:"à facturer",f:"facturé",r:"en retard",p:"payé",n:"sans marché"};
@@ -76,23 +77,23 @@ function appliquer(d){
   MOI=d.moi;
   S={
     clients:(d.clients||[]).map(function(c){return {id:c.id,nom:c.nom,mode:c.mode,tarif:+c.tarif,tel:c.tel||"",dep:+c.deplacement||0,par:c.cree_par};}),
-    chantiers:(d.chantiers||[]).filter(function(c){return !c.archive;}).map(function(c){return {id:c.id,client:c.client_id,nom:c.nom,court:c.court||"",ville:c.ville||"",adresse:c.adresse||"",col:c.couleur||0,debut:c.debut,ant:+c.jours_anterieurs||0,par:c.cree_par};}),
+    chantiers:(d.chantiers||[]).filter(function(c){return !c.archive;}).map(function(c){return {id:c.id,client:c.client_id,nom:c.nom,court:c.court||"",ville:c.ville||"",adresse:c.adresse||"",col:c.couleur||0,debut:c.debut,ant:+c.jours_anterieurs||0,par:c.cree_par,perso:!!c.perso,fixe:!!c.fixe,fin:c.fin||"",jp:+c.jours_perso||0,note:c.note||""};}),
     lots:(d.contrats||[]).map(function(l){return {id:l.id,ch:l.chantier_id,type:l.type,num:l.num,jours:+l.jours,mode:l.mode,prix:+l.prix,montant:l.montant==null?null:+l.montant,st:l.statut,nf:l.num_facture||"",df:l.date_facture||"",dp:l.date_paiement||"",ref:l.ref_commande||"",doc:l.document||""};}),
     P:{}, reg:d.reglages||{}
   };
   S.V={};(d.previsions||[]).forEach(function(v){S.V[v.jour]={serie:v.serie,client:v.client_id,lib:v.libelle||"",h:+v.heures};});
-  (d.journees||[]).forEach(function(j){S.P[j.jour]=j.absence?{abs:j.absence}:{it:(j.lignes||[]).map(function(x){return {ch:x.ch,h:+x.h,dep:!!x.dep};})};});
+  (d.journees||[]).forEach(function(j){S.P[j.jour]=j.absence?{abs:j.absence}:{it:(j.lignes||[]).map(function(x){return {ch:x.ch,h:+x.h,dep:!!x.dep,note:x.note||""};})};});
   // ce qui n'est pas encore parti (pas de réseau) reste visible
   OUT.forEach(function(o){if(o.fn==="prtech_journee_enregistrer"){var a=o.args;
-    if(a.p_absence)S.P[a.p_jour]={abs:a.p_absence};else if(a.p_lignes&&a.p_lignes.length)S.P[a.p_jour]={it:a.p_lignes.map(function(x){return {ch:x.ch,h:+x.h,dep:!!x.dep};})};else delete S.P[a.p_jour];}});
+    if(a.p_absence)S.P[a.p_jour]={abs:a.p_absence};else if(a.p_lignes&&a.p_lignes.length)S.P[a.p_jour]={it:a.p_lignes.map(function(x){return {ch:x.ch,h:+x.h,dep:!!x.dep,note:x.note||""};})};else delete S.P[a.p_jour];}});
   JH=+S.reg.JOURNEE_HEURES||8;
 }
 function charger(){return rpc("prtech_lire",{p_jeton:JETON}).then(function(d){lsSet("prtech_cache",JSON.stringify(d));appliquer(d);});}
 function recharger(){var ae=document.activeElement;if(SH||OUT.length||(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)))return;TODAY=aujourdhui();charger().then(renderAll,function(){});}
 
-function sJour(d){var p=S.P[d];return pousser("prtech_journee_enregistrer",{p_jeton:JETON,p_jour:d,p_absence:p&&p.abs||null,p_lignes:p&&p.it?p.it.map(function(x){return x.dep?{ch:x.ch,h:x.h,dep:true}:{ch:x.ch,h:x.h};}):[]});}
+function sJour(d){var p=S.P[d];return pousser("prtech_journee_enregistrer",{p_jeton:JETON,p_jour:d,p_absence:p&&p.abs||null,p_lignes:p&&p.it?p.it.map(function(x){var o={ch:x.ch,h:x.h};if(x.dep)o.dep=true;if(x.note)o.note=x.note;return o;}):[]});}
 function sClient(c){return pousser("prtech_client_enregistrer",{p_jeton:JETON,p:{id:c.id,nom:c.nom,mode:c.mode,tarif:c.tarif,tel:c.tel||null,deplacement:c.dep||0}});}
-function sChantier(c){return pousser("prtech_chantier_enregistrer",{p_jeton:JETON,p:{id:c.id,client_id:c.client,nom:c.nom,court:c.court||null,ville:c.ville||null,adresse:c.adresse||null,couleur:c.col,debut:c.debut,jours_anterieurs:c.ant||0,archive:false}});}
+function sChantier(c){return pousser("prtech_chantier_enregistrer",{p_jeton:JETON,p:{id:c.id,client_id:c.client||"",nom:c.nom,court:c.court||null,ville:c.ville||null,adresse:c.adresse||null,couleur:c.col,debut:c.debut,jours_anterieurs:c.ant||0,archive:!!c.archive,perso:!!c.perso,fixe:!!c.fixe,fin:c.fin||"",jours_perso:c.jp||"",note:c.note||""}});}
 function sLot(l){return pousser("prtech_contrat_enregistrer",{p_jeton:JETON,p:{id:l.id,chantier_id:l.ch,type:l.type,num:l.num,jours:l.jours,mode:l.mode,prix:l.prix,montant:l.montant==null?"":l.montant,statut:l.st,num_facture:l.nf,date_facture:l.df,date_paiement:l.dp,ref_commande:l.ref,document:l.doc}});}
 
 /* jours réservés à l'avance, avant devis ou contrat */
@@ -119,12 +120,16 @@ function compute(){
   var res={days:{},ch:{},lot:{}}, occ={};
   function push(d,e){(res.days[d]=res.days[d]||[]).push(e);}
   var dates=Object.keys(S.P).sort();
+  // tâches perso à date fixe : leurs jours sont pris avant tout le reste (week-ends compris)
+  S.chantiers.forEach(function(c){if(!c.perso||!c.fixe||!c.fin)return;
+    for(var x=c.debut,g0=0;x<=c.fin&&g0<400;x=add(x,1),g0++)if(!S.P[x]){push(x,{ch:c.id,lot:null,kind:"prevu",frac:1});occ[x]=c.id;}});
   chOrder().forEach(function(ch){
     var lots=lotsOf(ch.id), total=0, bounds=[];
     lots.forEach(function(l){bounds.push({l:l,b:total+(+l.jours||0)});total+=(+l.jours||0);
       res.lot[l.id]={faits:0,h:0,reprise:0,prevus:0,du:null,au:null,finit:false};});
     function lotAt(pos){for(var i=0;i<bounds.length;i++)if(pos<bounds[i].b-1e-9)return bounds[i];return bounds[bounds.length-1]||null;}
     function mark(l,d){var s=res.lot[l.id];if(!s.du||d<s.du)s.du=d;if(!s.au||d>s.au)s.au=d;}
+    if(ch.perso)total=ch.fixe?nbJours(ch.debut,ch.fin):(ch.jp||0);
     var pos=0, faits=0, hours=0, first=null, last=null, deps=0;
     // jours faits avant la mise en service de l'outil
     var ant=Math.min(ch.ant||0,total||ch.ant||0);
@@ -144,9 +149,11 @@ function compute(){
     });
     // Le planning part de la vraie date de début : les jours passés non notés
     // restent « prévus » (avec un ? à confirmer) tant que personne ne les a saisis.
-    var rest=total-pos, d=ch.debut, planned=[], guard=0;
+    var rest=ch.perso&&ch.fixe?0:total-pos, d=ch.debut, planned=[], guard=0;
+    if(ch.perso&&ch.fixe)for(var xf=ch.debut,gf=0;xf<=ch.fin&&gf<400;xf=add(xf,1),gf++)if(!S.P[xf])planned.push(xf);
+    // un chantier facturé se cale du lundi au vendredi ; une tâche perso aussi le week-end
     while(rest>1e-9 && guard<1500){
-      if(ouvre(d) && !S.P[d] && !occ[d] && !S.V[d]){
+      if((ch.perso?true:ouvre(d)) && !S.P[d] && !occ[d] && !S.V[d]){
         var f=Math.min(1,rest), bd2=lotAt(pos), l2=bd2&&bd2.l;
         push(d,{ch:ch.id,lot:l2&&l2.id,kind:"prevu",frac:f});
         occ[d]=ch.id;
@@ -157,10 +164,12 @@ function compute(){
     }
     lots.forEach(function(l){res.lot[l.id].finit=res.lot[l.id].faits>=(+l.jours)-1e-9;});
     res.ch[ch.id]={dep:deps,total:total,faits:faits,h:hours,restants:Math.max(0,total-faits),depasse:lots.length?Math.max(0,faits-total):0,
-      sansMarche:!lots.length,debut:first||planned[0]||ch.debut,fin:planned.length?planned[planned.length-1]:last,planned:planned};
+      perso:!!ch.perso,sansMarche:!lots.length&&!ch.perso,debut:first||planned[0]||ch.debut,fin:planned.length?planned[planned.length-1]:last,planned:planned};
   });
   R=res;
 }
+function nbJours(a,b){if(!a||!b||b<a)return 0;return Math.round((D(b)-D(a))/864e5)+1;}
+function estPerso(chid){var c=chById(chid);return !!(c&&c.perso);}
 function finsSnapshot(){var o={};S.chantiers.forEach(function(c){o[c.id]=R.ch[c.id]&&R.ch[c.id].fin;});return o;}
 function diffFins(before){var m=[];chOrder().forEach(function(c){var a=before[c.id],b=R.ch[c.id].fin;if(a&&b&&a!==b)m.push(court(c)+" "+fd(a)+" → "+fd(b));});return m;}
 
@@ -381,19 +390,29 @@ function luiCal(){
     h+='<button class="'+cls+'" style="'+(pp&&pp.abs||ms||rv?"":bg.style)+'" data-act="open" data-d="'+d+'" aria-label="'+fdl(d)+(ms?", à confirmer":"")+'">'
       +'<span class="n">'+(+d.slice(8))+'</span><span class="nm">'+esc(nm)+'</span>'+(ms?'<span class="q">?</span>':'<span class="h">'+lab+'</span>')+'</button>';
   });
-  h+='</div><div class="legend"><span><i class="key k1"></i>Fait</span><span><i class="key k2"></i>Prévu</span><span><i class="key k5"></i>Réservé</span><span><i class="key k3"></i>Pas travaillé</span><span><i class="key k4">?</i>À remplir</span></div></div>';
-  var jt=0,ht=0;days.forEach(function(d){var pp=S.P[d];if(pp&&pp.it){jt++;ht+=pp.it.reduce(function(a,x){return a+(+x.h);},0);}});
+  h+='</div><div class="legend"><span><i class="key k1"></i>Fait</span><span><i class="key k2"></i>Prévu</span><span><i class="key k5"></i>Réservé</span><span><i class="key k6"></i>Perso</span><span><i class="key k3"></i>Pas travaillé</span><span><i class="key k4">?</i>À remplir</span></div></div>';
+  var jt=0,ht=0;days.forEach(function(d){var pp=S.P[d];if(pp&&pp.it){var tr=pp.it.filter(function(x){return !estPerso(x.ch);});if(tr.length){jt++;ht+=tr.reduce(function(a,x){return a+(+x.h);},0);}}});
   h+='<div class="sect"><div class="rtitle">Mon mois · '+monthLabel(LM)+'</div><div class="stats">'
     +'<div class="stat"><div class="l">Jours</div><div class="v">'+jt+'</div></div>'
     +'<div class="stat"><div class="l">Heures</div><div class="v">'+hh(ht)+'</div></div>'
     +'<div class="stat"><div class="l">Moy./jour</div><div class="v">'+(jt?hh(ht/jt):"—")+'</div></div></div></div>';
+  h+=dispos(days);
   return h;
 }
+/* ce qui reste du mois affiché : jours de chantier, jours perso, jours libres */
+function dispos(days){var a=days.filter(function(d){return d>=TODAY;});if(!a.length)return "";
+  var c=0,p=0,l=0;a.forEach(function(d){var e=R.days[d]||[],pp=S.P[d];
+    var per=e.some(function(x){return estPerso(x.ch);}), chn=e.some(function(x){return !estPerso(x.ch);})||resa(d);
+    if(per)p++;else if(chn)c++;else if(ouvre(d)&&!(pp&&pp.abs))l++;});
+  return '<div class="sect"><div class="rtitle">Mes disponibilités'+(a[0]===TODAY?' d\'ici la fin du mois':'')+'</div><div class="stats">'
+    +'<div class="stat"><div class="l">Chantiers</div><div class="v">'+c+' j</div></div>'
+    +'<div class="stat"><div class="l">Perso</div><div class="v" style="color:'+PERSO+'">'+p+' j</div></div>'
+    +'<div class="stat hl"><div class="l">Libres</div><div class="v">'+l+' j</div></div></div></div>';}
 function luiChs(){
   var h='<div class="ltop"><div class="t">Mes chantiers</div><div class="s">Ce qui reste, la fin prévue, l\'état à envoyer</div></div><div class="sect" style="border-top:none">';
   var g=donnees();
   if(g>0.01)h+='<div class="gift"><div class="big">'+jj(g/JH)+'</div><div class="txt"><b>donnés gratuitement</b><br>'+hh(g)+' au-delà des journées de '+JH+' h vendues</div></div>';
-  var list=chOrder().filter(function(c){var r=R.ch[c.id];return r.restants>0||(r.sansMarche&&r.fin&&r.fin>=add(TODAY,-30));});
+  var list=chOrder().filter(function(c){var r=R.ch[c.id];return !c.perso&&r.restants>0||(r.sansMarche&&r.fin&&r.fin>=add(TODAY,-30));});
   h+='<div class="rtitle" style="margin-top:14px">En cours et à venir</div><div class="chl">';
   list.forEach(function(c){h+=chCard(c);});
   if(!list.length)h+='<div class="note">Aucun chantier en cours.</div>';
@@ -402,10 +421,19 @@ function luiChs(){
   if(sr.length){h+='<div class="rtitle" style="margin-top:18px">Réservé, en attente de contrat</div><div class="chl">';
     sr.forEach(function(x){h+='<div class="chc rs"><div class="top"><i class="key k5"></i><span class="nm">'+esc(resaNom(x))+'</span><span class="tag2 t-neu">'+jj(x.jours.length)+'</span></div><div class="cl">'+esc(resaClient(x))+'</div><div class="info"><span>Du <b>'+fd(x.jours[0])+'</b> au <b>'+fd(x.jours[x.jours.length-1])+'</b></span><span>'+hh(x.h)+' par jour</span></div></div>';});
     h+='</div>';}
-  var done=chOrder().filter(function(c){return list.indexOf(c)<0;});
+  var pl=persoList();
+  h+='<div class="rtitle" style="margin-top:18px">Mes tâches perso</div><div class="chl">'+pl.map(persoCarte).join("")+(pl.length?'':'<div class="note">Aucune tâche perso prévue.</div>')+'</div>'
+    +'<button class="addrow" style="width:100%;margin-top:10px" data-act="newperso">+ Tâche perso</button>';
+  var done=chOrder().filter(function(c){return !c.perso&&list.indexOf(c)<0;});
   if(done.length){h+='<div class="rtitle" style="margin-top:18px">Terminés</div><div class="chl">';done.forEach(function(c){h+=chCard(c);});h+='</div>';}
   return h+'</div>';
 }
+function persoList(){return chOrder().filter(function(c){if(!c.perso)return false;var r=R.ch[c.id];return r.restants>0||(r.fin&&r.fin>=add(TODAY,-7));});}
+function persoQuand(c){var r=R.ch[c.id];if(c.fixe)return c.debut===c.fin?'le '+fd(c.debut):'du '+fd(c.debut)+' au '+fd(c.fin);
+  if(r.restants<=0)return 'terminé';return r.planned.length?(r.planned.length>1?'du '+fd(r.planned[0])+' au '+fd(r.fin):'le '+fd(r.planned[0])):'';}
+function persoCarte(c){var r=R.ch[c.id];
+  return '<button class="chc perso" data-act="editperso" data-ch="'+c.id+'"><div class="top"><span class="dot" style="background:'+PERSO+'"></span><span class="nm">'+esc(c.nom)+'</span><span class="tag2 t-perso">'+(c.fixe?'date fixe':jj(r.total)+' à caler')+'</span></div>'
+    +'<div class="info"><span>'+persoQuand(c)+'</span><span>'+(!c.fixe&&r.restants>0&&r.faits?'reste '+jj(r.restants):'')+'</span></div>'+(c.note?'<div class="cl">'+esc(c.note)+'</div>':'')+'</button>';}
 function chCard(c){var r=R.ch[c.id], g=donnees(c.id), h="";
   h+='<div class="chc"><div class="top"><span class="dot" style="background:'+col(c)+'"></span><span class="nm">'+esc(c.nom)+'</span>'+(r.sansMarche?'<span class="tag2 t-amb">sans devis</span>':'')+'</div>'
     +'<div class="cl">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</div>';
@@ -435,7 +463,7 @@ function placeOv(ctx){var ov=document.getElementById("ov");
   ov.hidden=false;}
 function openSheet(d,ctx){
   var p=S.P[d], rows=[], abs=null, e=R.days[d]||[];
-  if(p&&p.it)rows=p.it.map(function(i){return {ch:i.ch,h:+i.h,dep:!!i.dep};});
+  if(p&&p.it)rows=p.it.map(function(i){return {ch:i.ch,h:+i.h,dep:!!i.dep,note:i.note||""};});
   else if(p&&p.abs)abs=p.abs;
   if(!rows.length){var pv=e.filter(function(x){return x.kind==="prevu";})[0];rows=[{ch:pv?pv.ch:null,h:JH}];}
   var rv=resa(d), planifie=e.some(function(x){return x.kind==="prevu";}), vv;
@@ -446,6 +474,31 @@ function openSheet(d,ctx){
 }
 function openEtat(sel,ctx){SH={kind:"etat",sel:sel,ctx:ctx,o:{f:true,h:false}};placeOv(ctx);renderSheet();prepPDF().catch(function(){});}
 function openCl(ctx,id){SH={kind:"cl",ctx:ctx,id:id||null,err:""};placeOv(ctx);renderSheet();}
+function openPerso(ctx,id){var c=id?chById(id):null;
+  SH={kind:"perso",ctx:ctx,id:id||null,err:"",arme:false,dr:c?{nom:c.nom,fixe:c.fixe,du:c.debut,au:c.fin||c.debut,j:c.jp||1,note:c.note}:{nom:"",fixe:false,du:TODAY,au:TODAY,j:1,note:""}};
+  placeOv(ctx);renderSheet();}
+function lirePerso(){var d=SH.dr,g=function(id){var e=document.getElementById(id);return e?e.value.trim():null;},v;
+  if((v=g("pp-nom"))!=null)d.nom=v;if((v=g("pp-du"))!=null)d.du=v;if((v=g("pp-au"))!=null)d.au=v;if((v=g("pp-j"))!=null)d.j=parseInt(v,10);if((v=g("pp-note"))!=null)d.note=v;}
+function feuillePerso(){var d=SH.dr,h="";
+  h+='<div class="shh"><div><div class="t">'+(SH.id?"Modifier la tâche perso":"Nouvelle tâche perso")+'</div><div class="s">0 € · seulement dans le planning de Patrice</div></div><button class="x" data-act="close" aria-label="Fermer">✕</button></div>';
+  h+='<div class="nc"><label class="full">Quoi<input id="pp-nom" value="'+esc(d.nom)+'" placeholder="ex. Abri de jardin"></label></div>';
+  h+='<div class="seg"><button data-act="pmode" data-k="fixe" aria-pressed="'+d.fixe+'">Date fixe</button><button data-act="pmode" data-k="caler" aria-pressed="'+(!d.fixe)+'">À caler</button></div>';
+  h+='<div class="nc">'+(d.fixe
+    ?'<label>Du<input type="date" id="pp-du" value="'+d.du+'"></label><label>Au<input type="date" id="pp-au" value="'+d.au+'"></label>'
+    :'<label>Nombre de jours<input type="number" id="pp-j" min="1" step="1" value="'+d.j+'"></label><label>Pas avant le<input type="date" id="pp-du" value="'+d.du+'"></label>')
+    +'<label class="full">Note (facultatif)<input id="pp-note" value="'+esc(d.note||"")+'"></label>'
+    +'<div class="note">'+(d.fixe?'Ces jours sont bloqués, week-ends compris. Les chantiers se décalent autour.':'Se cale comme un chantier, samedi et dimanche compris. Les chantiers avancent ou reculent autour.')+'</div></div>';
+  if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
+  h+='<div class="shf">'+(SH.id?'<button class="bs danger" data-act="delperso">'+(SH.arme?"Confirmer":"Supprimer")+'</button>':'<button class="bs" data-act="close">Annuler</button>')+'<button class="bp" data-act="saveperso">Enregistrer</button></div>';
+  return h;}
+function savePerso(){lirePerso();var d=SH.dr;
+  if(!d.nom){SH.err="Dis ce que c'est.";return renderSheet();}
+  if(!d.du){SH.err="Indique une date.";return renderSheet();}
+  if(d.fixe&&(!d.au||d.au<d.du)){SH.err="La date de fin est avant le début.";return renderSheet();}
+  if(!d.fixe&&!(d.j>=1)){SH.err="Indique au moins 1 jour.";return renderSheet();}
+  var before=finsSnapshot(), c=SH.id?chById(SH.id):{id:uid(),client:null,ville:"",adresse:"",col:0,ant:0,par:MOI.nom,perso:true};
+  c.nom=d.nom;c.court=d.nom.split(/\s+/)[0].slice(0,9);c.fixe=d.fixe;c.debut=d.du;c.fin=d.fixe?d.au:"";c.jp=d.fixe?0:d.j;c.note=d.note||"";
+  if(!SH.id)S.chantiers.push(c);sChantier(c);finish(before,"Tâche perso enregistrée : "+c.nom);}
 function closeSheet(){SH=null;document.getElementById("ov").hidden=true;}
 function chantiersFor(d){
   var pvs=(R.days[d]||[]).filter(function(e){return e.kind==="prevu";}).map(function(e){return e.ch;});
@@ -458,6 +511,7 @@ function chantiersFor(d){
 }
 function renderSheet(){
   var h="";
+  if(SH.kind==="perso"){document.getElementById("sheet").innerHTML=feuillePerso();return;}
   if(SH.kind==="lot"){document.getElementById("sheet").innerHTML=feuilleLot();return;}
   if(SH.kind==="ch"){document.getElementById("sheet").innerHTML=feuilleCh();return;}
   if(SH.kind==="etat"){
@@ -489,7 +543,7 @@ function renderSheet(){
       SH.rows.forEach(function(r,i){
         h+='<div class="rowc"><div class="lbl"><span>'+(SH.rows.length>1?"Chantier "+(i+1):"Chantier")+'</span>'+(i>0?'<button data-act="delrow" data-i="'+i+'">Retirer</button>':'')+'</div><div class="pick">';
         list.forEach(function(c){var isPv=pv.some(function(x){return x.ch===c.id;}), sm=R.ch[c.id].sansMarche;
-          h+='<button class="pk" data-act="pick" data-i="'+i+'" data-ch="'+c.id+'" aria-pressed="'+(r.ch===c.id)+'"><span class="dot" style="background:'+col(c)+'"></span><span><span class="nm">'+esc(c.nom)+'</span><span class="cl">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span></span>'+(isPv?'<span class="tag">prévu</span>':sm?'<span class="tag r">sans devis</span>':'')+'</button>';});
+          h+='<button class="pk" data-act="pick" data-i="'+i+'" data-ch="'+c.id+'" aria-pressed="'+(r.ch===c.id)+'"><span class="dot" style="background:'+col(c)+'"></span><span><span class="nm">'+esc(c.nom)+'</span><span class="cl">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span></span>'+(c.perso?'<span class="tag p">perso</span>':isPv?'<span class="tag">prévu</span>':sm?'<span class="tag r">sans devis</span>':'')+'</button>';});
         if(SH.nc===i){
           h+='<div class="nc"><label class="full">Client<select id="nc-client">'+S.clients.map(function(c){return '<option value="'+c.id+'">'+esc(c.nom)+' · '+tarifTxt(c.mode,c.tarif)+'</option>';}).join("")+'<option value="new">+ Nouveau client</option></select></label>'
             +'<label class="full">Nouveau client (si besoin)<input id="nc-cnom" placeholder="ex. Mme Garcia"></label>'
@@ -500,9 +554,9 @@ function renderSheet(){
             +'<div class="note">Sans devis signé : Marine reçoit une alerte pour faire le devis ou le marché.</div>'
             +'<button class="bp" data-act="nc-create" data-i="'+i+'">Ajouter ce chantier</button></div>';
         }else h+='<button class="pk new" data-act="nc-open" data-i="'+i+'">+ Autre chantier (pas dans la liste)</button>';
-        h+='</div><div class="lbl"><span>Heures</span></div><div class="step"><button data-act="hstep" data-i="'+i+'" data-k="-0.5" aria-label="Moins une demi-heure">−</button>'
+        h+='</div>'+(estPerso(r.ch)?'<div class="lbl"><span>Journée perso · 8 h</span></div><input class="pnote" id="pn-'+i+'" value="'+esc(r.note||"")+'" placeholder="Détail (facultatif)">':'<div class="lbl"><span>Heures</span></div><div class="step"><button data-act="hstep" data-i="'+i+'" data-k="-0.5" aria-label="Moins une demi-heure">−</button>'
           +'<input type="number" inputmode="decimal" step="0.5" min="0" max="16" id="hin-'+i+'" data-hin="'+i+'" value="'+r.h+'" aria-label="Heures"><span class="u">h</span>'
-          +'<button data-act="hstep" data-i="'+i+'" data-k="0.5" aria-label="Plus une demi-heure">+</button></div>'+depBtn(r,i)+'</div>';
+          +'<button data-act="hstep" data-i="'+i+'" data-k="0.5" aria-label="Plus une demi-heure">+</button></div>')+depBtn(r,i)+'</div>';
       });
       if(SH.rows.length<2)h+='<button class="addrow" data-act="addrow">+ J\'ai aussi été sur un autre chantier ce jour-là</button>';
     }else if(SH.mode==="v"){
@@ -528,7 +582,7 @@ function renderSheet(){
 function depBtn(r,i){var c=r.ch&&chById(r.ch),cl=c&&clById(c.client);if(!cl||!(cl.dep>0))return "";
   return '<button class="dep" data-act="dep" data-i="'+i+'" aria-pressed="'+(!!r.dep)+'"><span class="box">'+(r.dep?"✓":"")+'</span><span>Déplacement</span><small>'+eur(cl.dep)+'</small></button>';}
 function val(id){var e=document.getElementById(id);return e?e.value.trim():"";}
-function lireHeures(){if(!SH||SH.kind!=="day")return;SH.rows.forEach(function(r,i){var e=document.getElementById("hin-"+i);if(e){var v=parseFloat(String(e.value).replace(",","."));r.h=isNaN(v)?0:v;}});}
+function lireHeures(){if(!SH||SH.kind!=="day")return;SH.rows.forEach(function(r,i){var e=document.getElementById("hin-"+i);if(e){var v=parseFloat(String(e.value).replace(",","."));r.h=isNaN(v)?0:v;}var n=document.getElementById("pn-"+i);if(n)r.note=n.value.trim();});}
 function createChantierFromSheet(i){
   var cid=val("nc-client"), nom=val("nc-nom");
   if(!nom){SH.err="Donne un nom au chantier.";return renderSheet();}
@@ -565,9 +619,9 @@ function saveSheet(){
   if(SH.mode==="a"){S.P[d]={abs:SH.abs||ABS};}
   else{
     if(SH.rows.some(function(r){return !r.ch;})){SH.err="Choisis un chantier pour chaque ligne.";return renderSheet();}
-    if(SH.rows.some(function(r){return !(r.h>0)||r.h>16;})){SH.err="Indique des heures entre 0,5 et 16.";return renderSheet();}
+    if(SH.rows.some(function(r){return !estPerso(r.ch)&&(!(r.h>0)||r.h>16);})){SH.err="Indique des heures entre 0,5 et 16.";return renderSheet();}
     var seen={};if(SH.rows.some(function(r){if(seen[r.ch])return true;seen[r.ch]=1;})){SH.err="Le même chantier est choisi deux fois.";return renderSheet();}
-    S.P[d]={it:SH.rows.map(function(r){return {ch:r.ch,h:Math.round(r.h*2)/2,dep:!!r.dep};})};}
+    S.P[d]={it:SH.rows.map(function(r){var pe=estPerso(r.ch);return {ch:r.ch,h:pe?8:Math.round(r.h*2)/2,dep:!pe&&!!r.dep,note:pe?(r.note||""):""};})};}
   delete S.V[d];
   sJour(d);
   finish(before,"Journée du "+fd(d)+" enregistrée");
@@ -587,7 +641,7 @@ function renderMoi(){
   document.querySelectorAll("#tabs button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.tab===TAB?"true":"false");});
   el.innerHTML=TAB==="planning"?tPlanning():TAB==="marches"?tMarches():TAB==="heures"?tHeures():tRapport();
 }
-function barColor(c,l){if(MODE==="ch")return col(c);return l?STC[etat(l)]:STC.n;}
+function barColor(c,l){if(c&&c.perso)return PERSO;if(MODE==="ch")return col(c);return l?STC[etat(l)]:STC.n;}
 function tPlanning(){
   var days=monthDays(AM), off=dow(days[0]), h="";
   h+='<div class="pgrid"><div class="card"><div class="chead"><button class="arrow" data-act="am" data-k="-1" aria-label="Mois précédent">‹</button><h2 style="text-transform:capitalize;min-width:150px;text-align:center">'+monthLabel(AM)+'</h2><button class="arrow" data-act="am" data-k="1" aria-label="Mois suivant">›</button><span class="sp"></span>'
@@ -599,9 +653,9 @@ function tPlanning(){
     if(dow(d)>=5||ferie(d))cls+=" we"; if(d===TODAY)cls+=" today"; if(pp&&pp.abs)cls+=" abs"; if(ms)cls+=" miss";
     h+='<button class="'+cls+'" data-act="open2" data-d="'+d+'"><span class="n"><span>'+(+d.slice(8))+(ferie(d)?" · férié":"")+'</span>'+(pp&&pp.it?'<span>'+hh(pp.it.reduce(function(a,x){return a+(+x.h);},0))+'</span>':'')+'</span>';
     e.forEach(function(x){var c=chById(x.ch), l=x.lot?lotById(x.lot):null, cc=barColor(c,l);
-      var sm=l?(MODE==="fa"?lotShort(l)+" · "+STL[etat(l)]:lotShort(l)):"sans marché";
+      var sm=c.perso?"perso":l?(MODE==="fa"?lotShort(l)+" · "+STL[etat(l)]:lotShort(l)):"sans marché";
       var lab=esc(c.nom)+' <small>'+sm+(x.over?" · hors contrat":"")+'</small>';
-      if(x.kind==="fait")h+='<span class="bar" style="background:'+(x.over||!l?"var(--red)":cc)+'">'+lab+(pp.it.length>1?' <small>'+hh(x.h)+'</small>':'')+(x.dep?' <small>· dépl.</small>':'')+'</span>';
+      if(x.kind==="fait")h+='<span class="bar" style="background:'+(!c.perso&&(x.over||!l)?"var(--red)":cc)+'">'+lab+(pp.it.length>1?' <small>'+hh(x.h)+'</small>':'')+(x.dep?' <small>· dépl.</small>':'')+'</span>';
       else h+='<span class="bar pv" style="background:'+tint(cc)+';box-shadow:inset 3px 0 0 '+cc+'">'+lab+'</span>';
     });
     var rvm=resa(d);if(rvm)h+='<span class="bar rsv">Réservé · '+esc(resaNom(rvm))+' <small>'+esc(resaClient(rvm))+' · '+hh(rvm.h)+'</small></span>';
@@ -617,7 +671,7 @@ function tPlanning(){
   al.forEach(function(a){h+='<div class="al '+a.t+'"><span class="ic">'+a.ic+'</span><div>'+esc(a.h)+'<small>'+esc(a.s)+'</small></div></div>';});
   if(!al.length)h+='<div class="al"><div class="muted">Rien à signaler.</div></div>';
   h+='</div></div><div class="card"><div class="chead"><h2>Chantiers</h2><span class="muted" style="font-size:12.5px">dans l\'ordre du planning</span></div>';
-  chOrder().forEach(function(c){var r=R.ch[c.id];
+  chOrder().forEach(function(c){var r=R.ch[c.id];if(c.perso)return;
     var segs=lotsOf(c.id).map(function(l){var s=R.lot[l.id],cc=barColor(c,l),fa=Math.min(s.faits,l.jours);return '<i style="width:'+(r.total?fa/r.total*100:0)+'%;background:'+cc+'"></i><i style="width:'+(r.total?(l.jours-fa)/r.total*100:0)+'%;background:'+tint(cc)+'"></i>';}).join("");
     h+='<div class="chc"><div class="top"><span class="dot" style="background:'+col(c)+'"></span><span class="nm">'+esc(c.nom)+'</span><span class="cl" style="margin-left:auto">'+esc(clientOf(c))+'</span></div>';
     if(r.sansMarche)h+='<div class="info"><span><b>'+jj(r.faits)+'</b> · '+hh(r.h)+'</span><span class="badge b-n">sans marché</span></div>';
@@ -625,7 +679,11 @@ function tPlanning(){
       +'<div style="display:flex;gap:5px;flex-wrap:wrap">'+lotsOf(c.id).map(function(l){var e=etat(l);return '<span class="badge b-'+e+'">'+lotShort(l)+' · '+STL[e]+'</span>';}).join("")+'</div>';
     h+='</div>';
   });
-  h+='</div></div></div>';
+  h+='</div>';
+  var pl=persoList();
+  h+='<div class="card"><div class="chead"><h2>Tâches perso de Patrice</h2><span class="sp"></span><button class="bsm" data-act="newperso">+ Tâche perso</button></div><div class="chl" style="padding:10px 12px;margin:0">'
+    +(pl.length?pl.map(persoCarte).join(""):'<div class="note">Aucune tâche perso prévue.</div>')+'</div></div>';
+  h+='</div></div>';
   return h;
 }
 
@@ -645,7 +703,7 @@ function tMarches(){
     sr.forEach(function(x){var est=resaEstime(x);
       h+='<div class="li rs"><span class="li-t"><i class="key k5" style="margin-right:8px;vertical-align:-2px"></i>'+esc(resaNom(x))+'</span><span>'+esc(resaClient(x))+'</span><span class="muted">'+fd(x.jours[0])+' → '+fd(x.jours[x.jours.length-1])+' · '+jj(x.jours.length)+'</span><span class="muted">'+(est!=null?"≈ "+eur(est):"—")+'</span><button class="bsm pri" data-act="mkresa" data-serie="'+x.serie+'">Créer le marché</button></div>';});
     h+='</div>';}
-  chOrder().forEach(function(c){var r=R.ch[c.id], lots=lotsOf(c.id), cl=clById(c.client)||{mode:"jour",tarif:0};
+  chOrder().forEach(function(c){if(c.perso)return;var r=R.ch[c.id], lots=lotsOf(c.id), cl=clById(c.client)||{mode:"jour",tarif:0};
     var tm=lots.reduce(function(a,l){return a+montant(l).v;},0);
     h+='<div class="card"><div class="chead"><span class="dot" style="background:'+col(c)+'"></span><h2>'+esc(c.nom)+'</h2><span class="muted">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span>'+(c.par&&c.par!=="Marine"?'<span class="badge b-a">créé par '+esc(c.par)+'</span>':'')+'<span class="sp"></span>'
       +(function(){var dp=depCh(c);return dp.n?'<span class="resume">déplacements '+dp.n+' × '+eur(dp.pu)+' = <b>'+eur(dp.v)+'</b></span>':'';})()
@@ -744,7 +802,7 @@ function tHeures(){
   h+='<div class="expl"><div><b>Ce qui est facturé</b>Au jour ou au forfait : le montant du marché, quelles que soient les heures. À l\'heure : les heures réellement faites.</div>'
     +'<div><b>Ce qui est suivi en plus</b>Une journée de 10 h vendue '+JH+' h, c\'est '+(10-JH)+' h données. L\'outil les additionne et les traduit en jours gratuits. Patrice voit ce compteur dans ses chantiers.</div>'
     +'<div><b>À quoi ça sert</b>Le € / h réel montre ce que la journée rapporte vraiment. Les jours gratuits servent d\'argument pour un avenant ou pour le prix du prochain marché.</div></div></div>';
-  var mo={};Object.keys(S.P).forEach(function(d){var p=S.P[d];if(!p.it)return;var k=d.slice(0,7);mo[k]=mo[k]||{j:0,h:0};mo[k].j++;p.it.forEach(function(i){mo[k].h+=(+i.h);});});
+  var mo={};Object.keys(S.P).forEach(function(d){var p=S.P[d];if(!p.it)return;var tr=p.it.filter(function(i){return !estPerso(i.ch);});if(!tr.length)return;var k=d.slice(0,7);mo[k]=mo[k]||{j:0,h:0};mo[k].j++;tr.forEach(function(i){mo[k].h+=(+i.h);});});
   var ks=Object.keys(mo).sort();
   if(ks.length){h+='<div class="card"><div class="chead"><h2>Par mois</h2><span class="muted" style="font-size:12.5px">tous chantiers confondus</span></div><div class="tw"><table><thead><tr><th class="l">Mois</th><th>Jours travaillés</th><th>Heures faites</th><th>Base '+JH+' h / jour</th><th>Écart</th><th>Moyenne / jour</th></tr></thead><tbody>';
     ks.forEach(function(k){var m=mo[k],b=m.j*JH;h+='<tr><td class="l" style="text-transform:capitalize">'+monthLabel(k)+'</td><td>'+m.j+'</td><td>'+hh(m.h)+'</td><td>'+hh(b)+'</td><td class="'+(m.h-b>0?"pos":"")+'">'+(m.h-b>0?"+ ":"")+hh(m.h-b)+'</td><td>'+hh(m.h/m.j)+'</td></tr>';});
@@ -753,11 +811,11 @@ function tHeures(){
 }
 
 function tRapport(){
-  var chs=S.chantiers.filter(function(c){return RF==="all"||(RF==="cl:"+c.client)||(RF==="ch:"+c.id);});
+  var chs=S.chantiers.filter(function(c){return !c.perso&&RF==="all"||!c.perso&&(RF==="cl:"+c.client)||(RF==="ch:"+c.id);});
   var ids=chs.map(function(c){return c.id;}), lots=S.lots.filter(function(l){return ids.indexOf(l.ch)>=0;});
   var K={sig:0,real:0,fact:0,enc:0};
   lots.forEach(function(l){var m=montant(l).v;K.sig+=m;K.real+=realise(l);if(l.st!=="a")K.fact+=m;if(l.st==="p")K.enc+=m;});
-  var opt='<option value="all"'+(RF==="all"?" selected":"")+'>Tout</option><optgroup label="Par client">'+S.clients.map(function(c){return '<option value="cl:'+c.id+'"'+(RF==="cl:"+c.id?" selected":"")+'>'+esc(c.nom)+'</option>';}).join("")+'</optgroup><optgroup label="Par chantier">'+chOrder().map(function(c){return '<option value="ch:'+c.id+'"'+(RF==="ch:"+c.id?" selected":"")+'>'+esc(c.nom)+'</option>';}).join("")+'</optgroup>';
+  var opt='<option value="all"'+(RF==="all"?" selected":"")+'>Tout</option><optgroup label="Par client">'+S.clients.map(function(c){return '<option value="cl:'+c.id+'"'+(RF==="cl:"+c.id?" selected":"")+'>'+esc(c.nom)+'</option>';}).join("")+'</optgroup><optgroup label="Par chantier">'+chOrder().filter(function(c){return !c.perso;}).map(function(c){return '<option value="ch:'+c.id+'"'+(RF==="ch:"+c.id?" selected":"")+'>'+esc(c.nom)+'</option>';}).join("")+'</optgroup>';
   var h='<div class="rhead"><h2>Contrats, facturation et paiements</h2><select id="rf" data-chg="rf" aria-label="Périmètre du rapport">'+opt+'</select><span class="muted">situation au '+fdy(TODAY)+' · montants HT</span></div>';
   h+='<div class="kpis"><div class="kpi"><div class="l">Signé</div><div class="v">'+eur(K.sig)+'</div><div class="s">marchés + avenants</div></div>'
     +'<div class="kpi"><div class="l">Réalisé</div><div class="v">'+eur(K.real)+'</div><div class="s">au prorata des jours faits</div></div>'
@@ -833,6 +891,8 @@ document.addEventListener("click",function(e){
   if(a==="editlot"){var lo=lotById(b.dataset.lot);SH={kind:"lot",ctx:"moi",id:lo.id,dr:JSON.parse(JSON.stringify(lo)),err:"",arme:false};placeOv("moi");return renderSheet();}
   if(a==="editch"){SH={kind:"ch",ctx:"moi",id:b.dataset.ch,err:""};placeOv("moi");return renderSheet();}
   if(a==="editcl2")return openCl("moi",b.dataset.cl);
+  if(a==="newperso")return openPerso(b.closest("#moi")?"moi":"lui",null);
+  if(a==="editperso")return openPerso(b.closest("#moi")?"moi":"lui",b.dataset.ch);
   if(!SH&&a==="mkresa"){var g=series().filter(function(x){return x.serie===b.dataset.serie;})[0];if(!g)return;
     var cg=g.client&&clById(g.client);if(!cg)return toast("Client manquant","Ouvre un jour réservé et choisis le client");
     var bfr=finsSnapshot(), nch={id:uid(),client:cg.id,nom:g.lib||cg.nom,court:"",ville:"",adresse:"",col:S.chantiers.length%PAL.length,debut:g.jours[0],ant:0,par:MOI.nom};
@@ -869,6 +929,11 @@ document.addEventListener("click",function(e){
   if(a==="delv1"){var bv=finsSnapshot(),dv=SH.d;delete S.V[dv];dPrev([dv]);return finish(bv,"Réservation du "+fd(dv)+" retirée");}
   if(a==="delvs"){var bv2=finsSnapshot(),sv=SH.v.serie,js2=Object.keys(S.V).filter(function(k){return S.V[k].serie===sv;});js2.forEach(function(k){delete S.V[k];});dPrev(js2);return finish(bv2,js2.length+" jours réservés retirés");}
   if(a==="pick"){lireHeures();if(SH.rows[i].ch!==b.dataset.ch)SH.rows[i].dep=false;SH.rows[i].ch=b.dataset.ch;SH.err="";return renderSheet();}
+  if(a==="pmode"){lirePerso();SH.dr.fixe=b.dataset.k==="fixe";if(SH.dr.fixe&&SH.dr.au<SH.dr.du)SH.dr.au=SH.dr.du;SH.err="";return renderSheet();}
+  if(a==="saveperso")return savePerso();
+  if(a==="delperso"){var cp=chById(SH.id);if(R.ch[cp.id].faits>0){SH.err="Des journées sont déjà notées dessus : efface-les d'abord.";return renderSheet();}
+    if(!SH.arme){SH.arme=true;return renderSheet();}
+    var bp0=finsSnapshot();cp.archive=true;sChantier(cp);S.chantiers=S.chantiers.filter(function(x){return x.id!==cp.id;});return finish(bp0,"Tâche perso supprimée");}
   if(a==="dep"){lireHeures();SH.rows[i].dep=!SH.rows[i].dep;return renderSheet();}
   if(a==="nc-open"){lireHeures();SH.nc=i;return renderSheet();}
   if(a==="nc-create"){lireHeures();return createChantierFromSheet(i);}

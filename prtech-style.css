@@ -354,3 +354,11 @@ table.fit td .ps{white-space:normal}
 .dep small{margin-left:auto;color:var(--muted);font-weight:600;font-size:13px}
 .dep[aria-pressed="true"]{border-color:var(--blue);background:var(--blue-pale)}
 .dep[aria-pressed="true"] .box{background:var(--blue);border-color:var(--blue);color:#04121C}
+
+/* ---------- tâches perso de Patrice : orange ---------- */
+.key.k6{background:#F5A524;border-color:#F5A524}
+.tag2.t-perso{background:#F5A52433;color:var(--ink)}
+.pk .tag.p{color:#C77D00}
+.chc.perso{width:100%;text-align:left;font:inherit;color:inherit;border-color:#F5A524;cursor:pointer}
+.chc.perso:hover{background:var(--surface-2)}
+.pnote{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px;font-size:15px;width:100%}
