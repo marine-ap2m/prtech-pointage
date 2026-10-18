@@ -1018,8 +1018,11 @@ function demarrer(){
   });
 }
 (function(){
-  var q=new URLSearchParams(location.search), k=q.get("k");
-  if(k&&/^[0-9a-f-]{36}$/i.test(k)){JETON=k;lsSet("prtech_jeton",k);history.replaceState(null,"",location.pathname);}
+  var q=new URLSearchParams(location.search), k=q.get("k"), o=q.get("onglet");
+  if(k&&/^[0-9a-f-]{36}$/i.test(k)){JETON=k;lsSet("prtech_jeton",k);}
+  // Lien direct depuis la tour de contrôle AP2M : ?onglet=marches ouvre la gestion sur cet onglet
+  if(o&&/^(planning|marches|heures|rapport)$/.test(o))TAB=o;
+  if(k||o)history.replaceState(null,"",location.pathname);
   // Une nouvelle version de l'appli prend la main : la page se recharge seule (sauf saisie en cours).
   if("serviceWorker" in navigator){
     var avait=!!navigator.serviceWorker.controller, recharge=false;
