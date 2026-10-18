@@ -1008,11 +1008,23 @@ function connexion(){
   rpc("prtech_connexion",{p_code:c}).then(function(j){if(!j)return ecranConnexion("Code inconnu. Vérifie avec Marine.");JETON=j;lsSet("prtech_jeton",j);demarrer();},
     function(){ecranConnexion("Pas de réseau. Réessaie dans un instant.");});
 }
+/* Marine connectée à son compte AP2M (tour de contrôle, même site) : PRTECH s'ouvre sans code. */
+var ESSAI_AP2M=false;
+function jetonAP2M(){
+  var s=null;try{s=JSON.parse(lsGet("sb-zhgqqaedtmeowpjadtqr-auth-token"));}catch(e){}
+  if(!s||!s.access_token||(s.expires_at&&s.expires_at*1000<Date.now()+30000))return Promise.resolve(null);
+  return fetch(API+"/rest/v1/rpc/prtech_jeton_ap2m",{method:"POST",headers:{"apikey":CLE,"Authorization":"Bearer "+s.access_token,"Content-Type":"application/json"},body:"{}"})
+    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+}
+function sansCode(msg){
+  if(ESSAI_AP2M)return ecranConnexion(msg);ESSAI_AP2M=true;
+  jetonAP2M().then(function(j){if(j&&/^[0-9a-f-]{36}$/i.test(j)){JETON=j;lsSet("prtech_jeton",j);demarrer();}else ecranConnexion(msg);});
+}
 function demarrer(){
   var cache=null;try{cache=JSON.parse(lsGet("prtech_cache"));}catch(e){}
   function go(){squelette();setView(VIEW);renderAll();vider();}
   charger().then(go,function(e){
-    if(e.serveur){lsSet("prtech_jeton",null);JETON=null;return ecranConnexion("Ce lien n'est plus valable.");}
+    if(e.serveur){lsSet("prtech_jeton",null);JETON=null;return sansCode("Ce lien n'est plus valable.");}
     if(cache&&cache.moi){appliquer(cache);go();toast("Hors ligne","Tes saisies partiront dès que le réseau revient");}
     else ecranConnexion("Pas de réseau pour le premier chargement.");
   });
@@ -1033,6 +1045,6 @@ function demarrer(){
   }
   document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible"&&JETON&&S)recharger();});
   setInterval(function(){if(document.visibilityState==="visible"&&JETON&&S)recharger();},90000);
-  if(!JETON)return ecranConnexion();
+  if(!JETON)return sansCode();
   demarrer();
 })();
