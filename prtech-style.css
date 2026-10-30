@@ -369,3 +369,7 @@ table.fit td .ps{white-space:normal}
 .paye{width:28px;height:28px;border:none;background:none;padding:0}
 .paye .box{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);display:grid;place-items:center;font-size:15px;margin:auto}
 .paye[aria-pressed="true"] .box{background:var(--blue);border-color:var(--blue);color:#04121C}
+.rowact{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.rowact>.li,.rowact>.ct,.rowact>.ct-h{flex:1;min-width:0;border-bottom:none}
+.rowact .ra{flex:none;width:190px;display:flex;align-items:center;justify-content:flex-end;gap:6px;padding-right:14px}
+@media(max-width:820px){.rowact .ra{width:auto;flex-direction:column;gap:4px;padding:6px 8px}}

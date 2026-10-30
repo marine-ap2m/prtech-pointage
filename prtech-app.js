@@ -684,7 +684,7 @@ function tMarches(){
     +'<div class="act"><button class="bp" type="submit">Créer le marché</button></div></form></div>';
   h+='<div class="card"><div class="chead"><h2>Clients</h2><span class="muted" style="font-size:12.5px">tarifs visibles et modifiables par Patrice</span><span class="sp"></span><button class="bsm" data-act="newcl2">+ Nouveau client</button></div>';
   S.clients.forEach(function(cl){var n=S.chantiers.filter(function(c){return c.client===cl.id;}).length;
-    h+='<button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+(cl.dep?' · dépl. '+eur(cl.dep):'')+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button>';});
+    h+='<div class="rowact"><button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+(cl.dep?' · dépl. '+eur(cl.dep):'')+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button><span class="ra"><button class="bsm" data-act="editcl2" data-cl="'+cl.id+'">Modifier</button><button class="bsm danger" data-act="delcl0" data-cl="'+cl.id+'">Supprimer</button></span></div>';});
   h+='</div>';
   var sr=series();
   if(sr.length){h+='<div class="card"><div class="chead"><h2>Jours réservés, sans contrat</h2><span class="muted" style="font-size:12.5px">notés à l\'avance par Patrice · à transformer en marché quand le devis est signé</span></div>';
@@ -697,21 +697,21 @@ function tMarches(){
     h+='<div class="card"><div class="chead"><button class="tg" data-act="tgch" data-ch="'+c.id+'" aria-expanded="'+ouv+'"><span class="chev">'+(ouv?'▾':'▸')+'</span><span class="dot" style="background:'+col(c)+'"></span><h2>'+esc(c.nom)+'</h2><span class="muted">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span></button>'+(c.par&&c.par!=="Marine"?'<span class="badge b-a">créé par '+esc(c.par)+'</span>':'')+'<span class="sp"></span>'
       +(function(){var dp=depCh(c);return dp.n?'<span class="resume">déplacements '+dp.n+' × '+eur(dp.pu)+' = <b>'+eur(dp.v)+'</b></span>':'';})()
       +(r.sansMarche?'':'<span class="resume">'+jj(r.total)+' · <b>'+eur(tm)+'</b> · début '+fd(c.debut)+' · fin prévue <b>'+fd(r.fin)+'</b></span>')
-      +'<button class="bsm" data-act="editch" data-ch="'+c.id+'">Modifier</button></div>';
+      +'<button class="bsm" data-act="editch" data-ch="'+c.id+'">Modifier</button><button class="bsm danger" data-act="delch0" data-ch="'+c.id+'">Supprimer</button></div>';
     if(!ouv){h+='</div>';return;}
     if(r.sansMarche){
       h+='<div class="nolot"><span class="badge b-n">pas de marché signé</span><span>'+jj(r.faits)+' pointés ('+hh(r.h)+') · tarif client '+tarifTxt(cl.mode,cl.tarif)+'</span><span style="flex:1"></span><button class="bsm pri" data-act="mkmarche" data-ch="'+c.id+'">Créer le marché ('+jj(Math.max(1,Math.ceil(r.faits)))+')</button></div></div>';
       return;}
-    h+='<div class="ct-h"><span>Contrat</span><span>Jours</span><span>Montant HT</span><span>Période</span><span>Fait</span><span>Facturation</span><span></span></div>';
+    h+='<div class="rowact"><div class="ct-h"><span>Contrat</span><span>Jours</span><span>Montant HT</span><span>Période</span><span>Fait</span><span>Facturation</span><span></span></div><span class="ra"></span></div>';
     lots.forEach(function(l){var s=R.lot[l.id], m=montant(l), e=etat(l), fa=Math.min(s.faits,l.jours);
-      h+='<button class="ct" data-act="editlot" data-lot="'+l.id+'">'
+      h+='<div class="rowact"><button class="ct" data-act="editlot" data-lot="'+l.id+'">'
         +'<span class="ct-n"><b>'+lotName(l)+'</b>'+(l.ref?'<small>'+esc(l.ref)+'</small>':'')+'</span>'
         +'<span>'+jj(+l.jours)+'</span>'
         +'<span><b>'+eur(m.v)+'</b>'+(m.est?'<small>estimé</small>':'')+'</span>'
         +'<span class="muted">'+(s.du?fd(s.du)+' → '+fd(s.au):'—')+'</span>'
         +'<span class="ct-f"><span class="mini"><i style="width:'+(fa/l.jours*100)+'%;background:'+col(c)+'"></i></span><small>'+jj(fa)+' / '+jj(+l.jours)+'</small></span>'
         +'<span class="ct-s"><span class="badge b-'+e+'">'+STL[e]+'</span><small>'+esc(libFact(l))+'</small></span>'
-        +'<span class="go">›</span></button>';
+        +'<span class="go">›</span></button><span class="ra"><button class="bsm" data-act="editlot" data-lot="'+l.id+'">Modifier</button><button class="bsm danger" data-act="dellot0" data-lot="'+l.id+'">Supprimer</button></span></div>';
     });
     h+='<div class="cfoot"><button class="bsm" data-act="addav" data-ch="'+c.id+'">+ Ajouter un avenant</button><span>Clique un contrat pour modifier ses jours, son montant ou sa facture.</span></div></div>';
   });
@@ -882,6 +882,9 @@ document.addEventListener("click",function(e){
     S.lots.push(nlo);sLot(nlo);g.jours.forEach(function(k){delete S.V[k];});dPrev(g.jours);
     compute();toast("Marché créé : "+nch.nom,g.jours.length+" jours à partir du "+fd(g.jours[0])+". Ajuste les jours et le montant d'après le devis.");return renderAll();}
   if(a==="newcl2")return openCl("moi",null);
+  if(!SH&&a==="delcl0"){openCl("moi",b.dataset.cl);SH.arme=true;return renderSheet();}
+  if(!SH&&a==="delch0"){SH={kind:"ch",ctx:"moi",id:b.dataset.ch,err:"",arme:true};placeOv("moi");return renderSheet();}
+  if(!SH&&a==="dellot0"){var lz=lotById(b.dataset.lot);SH={kind:"lot",ctx:"moi",id:lz.id,dr:JSON.parse(JSON.stringify(lz)),err:"",arme:true};placeOv("moi");return renderSheet();}
   if(!SH&&a==="tgch"){OUV[b.dataset.ch]=!OUV[b.dataset.ch];return renderMoi();}
   if(!SH&&a==="paye"){var lp=lotById(b.dataset.lot);if(!lp)return;
     if(lp.st==="p"){lp.st="f";lp.dp="";}else{lp.st="p";if(!lp.df)lp.df=TODAY;if(!lp.dp)lp.dp=TODAY;}
