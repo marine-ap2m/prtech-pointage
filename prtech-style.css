@@ -332,7 +332,14 @@ td input[type=date]{width:134px}
 .seg3 button{border:none;background:none;border-radius:8px;padding:9px;font-weight:700;font-size:14px;color:var(--muted)}
 .seg3 button[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink)}
 .bs.danger{color:var(--red)}
-table.fit{table-layout:auto}
+table.fit{table-layout:fixed}
+table.fit th:nth-child(1){width:34%}
+table.fit th:nth-child(2){width:11%}
+table.fit th:nth-child(3){width:8%}
+table.fit th:nth-child(4){width:25%}
+table.fit th:nth-child(5),table.fit th:nth-child(6){width:11%}
+table.fit th:nth-child(7){width:60px}
+table.fit td{overflow-wrap:anywhere}
 table.fit td,table.fit th{white-space:normal}
 table.fit td .ps{white-space:normal}
 .gantt{overflow:hidden}

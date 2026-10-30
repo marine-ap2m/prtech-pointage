@@ -667,7 +667,7 @@ function tPlanning(){
 
 function libFact(l){var e=etat(l);
   if(e==="p")return "payé le "+fd(l.dp);
-  if(e==="f"||e==="r")return (l.nf?l.nf+" · ":"")+"échéance "+fd(echeance(l.df));
+  if(e==="f"||e==="r")return (l.nf?(l.nf.length>22?l.nf.slice(0,22)+"…":l.nf)+" · ":"")+"échéance "+fd(echeance(l.df));
   if(e==="a")return "terminé, à facturer";
   return "facturé à la fin";}
 function tMarches(){
