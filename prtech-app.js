@@ -304,7 +304,7 @@ function squelette(){
     +(gestion?'<div class="vsw"><button data-view="moi" aria-pressed="true">Gestion</button><button data-view="lui" aria-pressed="false">Vue Patrice</button></div>':'')+'</header>'
     +'<div id="view-lui"'+(gestion?' class="stage cadre" hidden':'')+'><div class="app" id="app"><div class="appscroll" id="lui"></div>'
     +'<nav class="lnav" id="lnav"><button data-lt="cal" aria-pressed="true"><i></i>Calendrier</button><button data-lt="chs" aria-pressed="false"><i></i>Chantiers</button><button data-lt="cls" aria-pressed="false"><i></i>Clients</button></nav></div></div>'
-    +(gestion?'<div id="view-moi" class="stage"><div class="wide"><div class="tabs" id="tabs"><button data-tab="planning" aria-pressed="true">Planning</button><button data-tab="marches" aria-pressed="false">Clients, marchés &amp; avenants</button><button data-tab="heures" aria-pressed="false">Jours vendus / heures faites</button><button data-tab="rapport" aria-pressed="false">Rapport &amp; états</button></div><div id="moi"></div></div></div>':'');
+    +(gestion?'<div id="view-moi" class="stage"><div class="wide"><div class="tabs" id="tabs"><button data-tab="planning" aria-pressed="true">Planning</button><button data-tab="marches" aria-pressed="false">Clients, marchés &amp; avenants</button><button data-tab="rapport" aria-pressed="false">Rapport &amp; états</button></div><div id="moi"></div></div></div>':'');
   VIEW=gestion?"moi":"lui";
   majAttente();
 }
@@ -621,7 +621,7 @@ function toast(t,s){var el=document.getElementById("toast");el.innerHTML="<b>"+e
 function renderMoi(){
   var el=document.getElementById("moi");if(!el)return;
   document.querySelectorAll("#tabs button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.tab===TAB?"true":"false");});
-  el.innerHTML=TAB==="planning"?tPlanning():TAB==="marches"?tMarches():TAB==="heures"?tHeures():tRapport();
+  el.innerHTML=TAB==="planning"?tPlanning():TAB==="marches"?tMarches():tRapport();
 }
 function barColor(c,l){if(c&&c.perso)return PERSO;if(MODE==="ch")return col(c);return l?STC[etat(l)]:STC.n;}
 function tPlanning(){
@@ -762,32 +762,6 @@ function feuilleCh(){
   if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
   if(SH.arme){var nl=lotsOf(c.id).length;h+='<div class="err">'+(nl?'Le chantier et ses '+nl+' contrat'+(nl>1?'s':'')+' sont retirés. Les jours déjà pointés ne seront plus comptés.':'Le chantier est retiré.')+'</div>';}
   h+='<div class="shf"><button class="bs danger" data-act="delch">'+(SH.arme?"Confirmer la suppression":"Supprimer")+'</button><button class="bp" data-act="savech">Enregistrer</button></div>';
-  return h;
-}
-
-function tHeures(){
-  var h='<div class="card"><div class="chead"><h2>Jours vendus et heures réellement faites</h2><span class="muted" style="font-size:12.5px">journée vendue = '+JH+' h · jours pointés dans l\'outil (hors reprise)</span></div><div class="tw"><table><thead><tr>'
-    +'<th class="l">Chantier · contrat</th><th>Jours pointés</th><th>Heures vendues</th><th>Heures faites</th><th>Écart</th><th>Jours gratuits</th><th>€ / h prévu</th><th>€ / h réel</th></tr></thead><tbody>';
-  var T={j:0,hv:0,hf:0,g:0}, any=false;
-  chOrder().forEach(function(c){lotsOf(c.id).forEach(function(l){var s=R.lot[l.id], fj=s.faits-s.reprise, fh=s.h-s.reprise*JH;if(fj<=1e-9)return;any=true;
-    var hv=fj*JH, ec=fh-hv, jour=l.mode==="jour", pj=montant(l).v/l.jours;T.j+=fj;T.hv+=hv;T.hf+=fh;if(jour)T.g+=ec;
-    h+='<tr><td class="l"><span class="dot" style="background:'+col(c)+';margin-right:7px;width:10px;height:10px"></span><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+esc(clientOf(c))+' · '+(jour?eur(pj)+" / jour":tarifTxt(l.mode,l.prix))+'</span></td>'
-      +'<td>'+jj(fj)+'</td><td>'+hh(hv)+'</td><td><b>'+hh(fh)+'</b><span class="ps">'+hh(fh/fj)+' / jour</span></td>'
-      +'<td class="'+(ec>0.01&&jour?"pos":"")+'">'+(ec>0?"+ ":ec<0?"− ":"")+hh(Math.abs(ec))+'</td>'
-      +'<td>'+(!jour?'<span class="muted">payé à l\'heure</span>':ec>0.01?'<b style="color:var(--red)">'+jj(ec/JH)+'</b>':'—')+'</td>'
-      +'<td>'+(jour?(pj/JH).toFixed(2).replace(".",","):l.prix.toFixed(2).replace(".",","))+' €</td><td><b>'+(jour?(fj*pj/fh).toFixed(2).replace(".",","):l.prix.toFixed(2).replace(".",","))+' €</b></td></tr>';
-  });});
-  if(!any)h+='<tr><td class="l muted" colspan="8">Rien encore : le tableau se remplit dès que Patrice note ses journées.</td></tr>';
-  else h+='<tr class="tot"><td class="l">Total</td><td>'+jj(T.j)+'</td><td>'+hh(T.hv)+'</td><td>'+hh(T.hf)+'</td><td></td><td style="color:var(--red)">'+jj(T.g/JH)+'<span class="ps">soit '+hh(T.g)+'</span></td><td></td><td></td></tr>';
-  h+='</tbody></table></div>';
-  h+='<div class="expl"><div><b>Ce qui est facturé</b>Au jour ou au forfait : le montant du marché, quelles que soient les heures. À l\'heure : les heures réellement faites.</div>'
-    +'<div><b>Ce qui est suivi en plus</b>Une journée de 10 h vendue '+JH+' h, c\'est '+(10-JH)+' h données. L\'outil les additionne et les traduit en jours gratuits. Patrice voit ce compteur dans ses chantiers.</div>'
-    +'<div><b>À quoi ça sert</b>Le € / h réel montre ce que la journée rapporte vraiment. Les jours gratuits servent d\'argument pour un avenant ou pour le prix du prochain marché.</div></div></div>';
-  var mo={};Object.keys(S.P).forEach(function(d){var p=S.P[d];if(!p.it)return;var tr=p.it.filter(function(i){return !estPerso(i.ch);});if(!tr.length)return;var k=d.slice(0,7);mo[k]=mo[k]||{j:0,h:0};mo[k].j++;tr.forEach(function(i){mo[k].h+=(+i.h);});});
-  var ks=Object.keys(mo).sort();
-  if(ks.length){h+='<div class="card"><div class="chead"><h2>Par mois</h2><span class="muted" style="font-size:12.5px">tous chantiers confondus</span></div><div class="tw"><table><thead><tr><th class="l">Mois</th><th>Jours travaillés</th><th>Heures faites</th><th>Base '+JH+' h / jour</th><th>Écart</th><th>Moyenne / jour</th></tr></thead><tbody>';
-    ks.forEach(function(k){var m=mo[k],b=m.j*JH;h+='<tr><td class="l" style="text-transform:capitalize">'+monthLabel(k)+'</td><td>'+m.j+'</td><td>'+hh(m.h)+'</td><td>'+hh(b)+'</td><td class="'+(m.h-b>0?"pos":"")+'">'+(m.h-b>0?"+ ":"")+hh(m.h-b)+'</td><td>'+hh(m.h/m.j)+'</td></tr>';});
-    h+='</tbody></table></div></div>';}
   return h;
 }
 
@@ -1030,7 +1004,7 @@ function demarrer(){
   var q=new URLSearchParams(location.search), k=q.get("k"), o=q.get("onglet");
   if(k&&/^[0-9a-f-]{36}$/i.test(k)){JETON=k;lsSet("prtech_jeton",k);}
   // Lien direct depuis la tour de contrôle AP2M : ?onglet=marches ouvre la gestion sur cet onglet
-  if(o&&/^(planning|marches|heures|rapport)$/.test(o))TAB=o;
+  if(o&&/^(planning|marches|rapport)$/.test(o))TAB=o;
   if(k||o)history.replaceState(null,"",location.pathname);
   // Une nouvelle version de l'appli prend la main : la page se recharge seule (sauf saisie en cours).
   if("serviceWorker" in navigator){
