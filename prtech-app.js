@@ -188,7 +188,9 @@ function realise(l){var s=R.lot[l.id];if(l.mode==="heure"&&l.montant==null)retur
 function donnees(filterCh){var h=0;S.lots.forEach(function(l){if(l.mode!=="jour")return;if(filterCh&&l.ch!==filterCh)return;var s=R.lot[l.id];h+=s.h-s.faits*JH;});return h;}
 function debutSuivi(){var m=S.reg.MISE_EN_SERVICE||TODAY;return m;}
 function manque(d){return d<TODAY&&d>=debutSuivi()&&ouvre(d)&&!S.P[d];}
-function argentClient(clid){var t={sig:0,fact:0,enc:0};S.lots.forEach(function(l){var c=chById(l.ch);if(!c||c.client!==clid)return;var m=montant(l).v;t.sig+=m;if(l.st!=="a")t.fact+=m;if(l.st==="p")t.enc+=m;});return t;}
+/* les déplacements font partie de la facture du chantier : ils sont portés par son premier contrat */
+function depLot(l){var c=chById(l.ch);if(!c)return 0;var ls=lotsOf(c.id);return ls[0]&&ls[0].id===l.id?depCh(c).v:0;}
+function argentClient(clid){var t={sig:0,fact:0,enc:0};S.lots.forEach(function(l){var c=chById(l.ch);if(!c||c.client!==clid)return;var m=montant(l).v+depLot(l);t.sig+=m;if(l.st!=="a")t.fact+=m;if(l.st==="p")t.enc+=m;});return t;}
 
 /* ---------------- état à envoyer ---------------- */
 function lotEtatTxt(l){var s=R.lot[l.id];
@@ -769,7 +771,7 @@ function tRapport(){
   var chs=S.chantiers.filter(function(c){return !c.perso&&RF==="all"||!c.perso&&(RF==="cl:"+c.client)||(RF==="ch:"+c.id);});
   var ids=chs.map(function(c){return c.id;}), lots=S.lots.filter(function(l){return ids.indexOf(l.ch)>=0;});
   var K={sig:0,real:0,fact:0,enc:0};
-  lots.forEach(function(l){var m=montant(l).v;K.sig+=m;K.real+=realise(l);if(l.st!=="a")K.fact+=m;if(l.st==="p")K.enc+=m;});
+  lots.forEach(function(l){var dl=depLot(l),m=montant(l).v+dl;K.sig+=m;K.real+=realise(l)+dl*Math.min(R.lot[l.id].faits,l.jours)/l.jours;if(l.st!=="a")K.fact+=m;if(l.st==="p")K.enc+=m;});
   var opt='<option value="all"'+(RF==="all"?" selected":"")+'>Tout</option><optgroup label="Par client">'+S.clients.map(function(c){return '<option value="cl:'+c.id+'"'+(RF==="cl:"+c.id?" selected":"")+'>'+esc(c.nom)+'</option>';}).join("")+'</optgroup><optgroup label="Par chantier">'+chOrder().filter(function(c){return !c.perso;}).map(function(c){return '<option value="ch:'+c.id+'"'+(RF==="ch:"+c.id?" selected":"")+'>'+esc(c.nom)+'</option>';}).join("")+'</optgroup>';
   var h='<div class="rhead"><h2>Contrats, facturation et paiements</h2><select id="rf" data-chg="rf" aria-label="Périmètre du rapport">'+opt+'</select><span class="muted">situation au '+fdy(TODAY)+' · montants HT</span></div>';
   h+='<div class="kpis"><div class="kpi"><div class="l">Signé</div><div class="v">'+eur(K.sig)+'</div><div class="s">marchés + avenants</div></div>'
@@ -786,10 +788,10 @@ function tRapport(){
     h+='<div class="card"><div class="chead"><h2>'+esc(cl.nom)+'</h2><span class="muted" style="font-size:12.5px">'+tarifTxt(cl.mode,cl.tarif)+'</span></div><table class="fit"><thead><tr><th class="l">Chantier · contrat</th><th>Montant</th><th>Fait</th><th class="l">Facturation</th><th>Reste à facturer</th><th>Reste à encaisser</th><th>Payé</th></tr></thead><tbody>';
     cc.forEach(function(c){var r=R.ch[c.id];
       if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché<span class="ps">'+jj(r.faits)+' · '+hh(r.h)+(depCh(c).n?' · déplacements '+depCh(c).n+' × '+eur(depCh(c).pu)+' = '+eur(depCh(c).v):'')+'</span></td><td>—</td><td>—</td><td class="l"><span class="badge b-n">devis à faire</span></td><td>—</td><td>—</td><td></td></tr>';return;}
-      lotsOf(c.id).forEach(function(l){var s=R.lot[l.id],mm=montant(l),m=mm.v,f=l.st!=="a"?m:0,p=l.st==="p"?m:0,e=etat(l);t.m+=m;t.f+=f;t.p+=p;
-      h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+jj(+l.jours)+(s.du?' · '+fd(s.du)+' → '+fd(s.au):'')+'</span></td><td>'+eur(m)+(mm.est?'<span class="ps">estimé</span>':'')+'</td><td>'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %</td>'
+      lotsOf(c.id).forEach(function(l){var s=R.lot[l.id],mm=montant(l),dl=depLot(l),m=mm.v+dl,f=l.st!=="a"?m:0,p=l.st==="p"?m:0,e=etat(l);t.m+=m;t.f+=f;t.p+=p;
+      h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+jj(+l.jours)+(s.du?' · '+fd(s.du)+' → '+fd(s.au):'')+'</span></td><td>'+eur(m)+(dl?'<span class="ps">dont déplacements '+eur(dl)+'</span>':'')+(mm.est?'<span class="ps">estimé</span>':'')+'</td><td>'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %</td>'
         +'<td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span><span class="ps">'+esc(libFact(l))+'</span></td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td><td><button class="paye" data-act="paye" data-lot="'+l.id+'" aria-pressed="'+(l.st==="p")+'" aria-label="Payé : '+esc(c.nom)+' '+lotName(l)+'"><span class="box">'+(l.st==="p"?"✓":"")+'</span></button></td></tr>';});
-      var dpr=depCh(c);if(dpr.n)h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · Déplacements<span class="ps">'+dpr.n+' × '+eur(dpr.pu)+'</span></td><td>'+eur(dpr.v)+'</td><td></td><td class="l"><span class="ps">en plus du marché, à ajouter à la facture</span></td><td></td><td></td><td></td></tr>';});
+    });
     h+='<tr class="tot"><td class="l">Total</td><td>'+eur(t.m)+'</td><td></td><td class="l">facturé '+eur(t.f)+' · encaissé '+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td><td></td></tr></tbody></table></div>';
   });
   var gch=chOrder().filter(function(c){return ids.indexOf(c.id)>=0&&R.ch[c.id].fin;});
