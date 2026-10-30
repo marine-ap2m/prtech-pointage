@@ -794,23 +794,6 @@ function tRapport(){
     });
     h+='<tr class="tot"><td class="l">Total</td><td>'+eur(t.m)+'</td><td></td><td class="l">facturé '+eur(t.f)+' · encaissé '+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td><td></td></tr></tbody></table></div>';
   });
-  var gch=chOrder().filter(function(c){return ids.indexOf(c.id)>=0&&R.ch[c.id].fin;});
-  if(gch.length){
-    var a=gch.reduce(function(m,c){var d=R.ch[c.id].debut;return !m||d<m?d:m;},null), b=gch.reduce(function(m,c){var d=R.ch[c.id].fin;return !m||d>m?d:m;},null);
-    if(a<add(TODAY,-60))a=add(TODAY,-60);
-    while(dow(a)!==0)a=add(a,-1);
-    var cols=[];for(var d=a;d<=b||dow(d)!==0;d=add(d,1))if(dow(d)<5)cols.push(d);
-    h+='<div class="card"><div class="chead"><h2>Calendrier</h2><span class="muted" style="font-size:12.5px">jours ouvrés · plein = fait, clair = prévu · trait noir = aujourd\'hui</span></div><div class="gantt"><div class="gt" style="grid-template-columns:auto repeat('+cols.length+',minmax(0,1fr))">';
-    h+='<div class="gl"></div>'+cols.map(function(d,k){var pas=cols.length>90?3:cols.length>45?2:1;return '<div class="gw">'+(dow(d)===0&&Math.floor(k/5)%pas===0?fd(d):"")+'</div>';}).join("");
-    gch.forEach(function(c){
-      h+='<div class="gl">'+esc(c.nom)+'<small>'+esc(clientOf(c))+'</small></div>';
-      cols.forEach(function(d){var e=(R.days[d]||[]).filter(function(x){return x.ch===c.id;})[0], bg="var(--surface-2)";
-        if(ferie(d))bg="var(--line)";
-        if(e)bg=e.kind==="fait"?col(c):tint(col(c));
-        h+='<div class="gd'+(d===TODAY?" td":"")+'" style="background:'+bg+'" title="'+fd(d)+'"></div>';});
-    });
-    h+='</div></div></div>';
-  }
   return h;
 }
 
