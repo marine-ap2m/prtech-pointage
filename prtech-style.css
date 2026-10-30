@@ -362,3 +362,10 @@ table.fit td .ps{white-space:normal}
 .chc.perso{width:100%;text-align:left;font:inherit;color:inherit;border-color:#F5A524;cursor:pointer}
 .chc.perso:hover{background:var(--surface-2)}
 .pnote{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px;font-size:15px;width:100%}
+
+/* chantier repliable (onglet marchés) et case Payé (onglet rapport) */
+.tg{display:flex;align-items:center;gap:8px;border:none;background:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;min-width:0;flex-wrap:wrap}
+.tg .chev{width:18px;color:var(--muted);font-size:15px}
+.paye{width:28px;height:28px;border:none;background:none;padding:0}
+.paye .box{width:24px;height:24px;border-radius:7px;border:2px solid var(--muted);display:grid;place-items:center;font-size:15px;margin:auto}
+.paye[aria-pressed="true"] .box{background:var(--blue);border-color:var(--blue);color:#04121C}
