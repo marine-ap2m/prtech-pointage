@@ -3,7 +3,7 @@
 Appli de pointage et de suivi des marchés de **PR.TECH** (Patrice Renaud EI).
 
 - **Patrice, sur son téléphone** : il note chaque jour son chantier et ses heures. Il reçoit un rappel à 20 h si la journée n'est pas notée. Il envoie un état de chantier ou de client en PDF.
-- **Marine, sur ordinateur** : elle saisit les marchés et les avenants en jours, suit le planning qui se recale tout seul, la facturation (45 jours fin de mois) et l'écart entre jours vendus et heures faites.
+- **Marine, sur ordinateur** : elle saisit les marchés et les avenants en jours, suit le planning qui se recale tout seul, la facturation (45 jours fin de mois).
 
 ## Comment ça marche
 

@@ -78,7 +78,7 @@ function appliquer(d){
   S={
     clients:(d.clients||[]).map(function(c){return {id:c.id,nom:c.nom,mode:c.mode,tarif:+c.tarif,tel:c.tel||"",dep:+c.deplacement||0,par:c.cree_par};}),
     chantiers:(d.chantiers||[]).filter(function(c){return !c.archive;}).map(function(c){return {id:c.id,client:c.client_id,nom:c.nom,court:c.court||"",ville:c.ville||"",adresse:c.adresse||"",col:c.couleur||0,debut:c.debut,ant:+c.jours_anterieurs||0,par:c.cree_par,perso:!!c.perso,fixe:!!c.fixe,fin:c.fin||"",jp:+c.jours_perso||0,note:c.note||""};}),
-    lots:(d.contrats||[]).map(function(l){return {id:l.id,ch:l.chantier_id,type:l.type,num:l.num,jours:+l.jours,mode:l.mode,prix:+l.prix,montant:l.montant==null?null:+l.montant,st:l.statut,nf:l.num_facture||"",df:l.date_facture||"",dp:l.date_paiement||"",ref:l.ref_commande||"",doc:l.document||""};}),
+    lots:(d.contrats||[]).filter(function(l){return (d.chantiers||[]).some(function(c){return c.id===l.chantier_id&&!c.archive;});}).map(function(l){return {id:l.id,ch:l.chantier_id,type:l.type,num:l.num,jours:+l.jours,mode:l.mode,prix:+l.prix,montant:l.montant==null?null:+l.montant,st:l.statut,nf:l.num_facture||"",df:l.date_facture||"",dp:l.date_paiement||"",ref:l.ref_commande||"",doc:l.document||""};}),
     P:{}, reg:d.reglages||{}
   };
   S.V={};(d.previsions||[]).forEach(function(v){S.V[v.jour]={serie:v.serie,client:v.client_id,lib:v.libelle||"",h:+v.heures};});
@@ -94,6 +94,7 @@ function recharger(){var ae=document.activeElement;if(SH||OUT.length||(ae&&/^(IN
 function sJour(d){var p=S.P[d];return pousser("prtech_journee_enregistrer",{p_jeton:JETON,p_jour:d,p_absence:p&&p.abs||null,p_lignes:p&&p.it?p.it.map(function(x){var o={ch:x.ch,h:x.h};if(x.dep)o.dep=true;if(x.note)o.note=x.note;return o;}):[]});}
 function sClient(c){return pousser("prtech_client_enregistrer",{p_jeton:JETON,p:{id:c.id,nom:c.nom,mode:c.mode,tarif:c.tarif,tel:c.tel||null,deplacement:c.dep||0}});}
 function sChantier(c){return pousser("prtech_chantier_enregistrer",{p_jeton:JETON,p:{id:c.id,client_id:c.client||"",nom:c.nom,court:c.court||null,ville:c.ville||null,adresse:c.adresse||null,couleur:c.col,debut:c.debut,jours_anterieurs:c.ant||0,archive:!!c.archive,perso:!!c.perso,fixe:!!c.fixe,fin:c.fin||"",jours_perso:c.jp||"",note:c.note||""}});}
+function dClient(id){return pousser("prtech_client_supprimer",{p_jeton:JETON,p_id:id});}
 function sLot(l){return pousser("prtech_contrat_enregistrer",{p_jeton:JETON,p:{id:l.id,chantier_id:l.ch,type:l.type,num:l.num,jours:l.jours,mode:l.mode,prix:l.prix,montant:l.montant==null?"":l.montant,statut:l.st,num_facture:l.nf,date_facture:l.df,date_paiement:l.dp,ref_commande:l.ref,document:l.doc}});}
 
 /* jours réservés à l'avance, avant devis ou contrat */
@@ -188,27 +189,6 @@ function donnees(filterCh){var h=0;S.lots.forEach(function(l){if(l.mode!=="jour"
 function debutSuivi(){var m=S.reg.MISE_EN_SERVICE||TODAY;return m;}
 function manque(d){return d<TODAY&&d>=debutSuivi()&&ouvre(d)&&!S.P[d];}
 function argentClient(clid){var t={sig:0,fact:0,enc:0};S.lots.forEach(function(l){var c=chById(l.ch);if(!c||c.client!==clid)return;var m=montant(l).v;t.sig+=m;if(l.st!=="a")t.fact+=m;if(l.st==="p")t.enc+=m;});return t;}
-
-function alerts(){
-  var out=[];
-  S.chantiers.forEach(function(ch){var c=R.ch[ch.id];
-    if(c.sansMarche&&c.faits>0)out.push({t:"r",ic:"!",h:ch.nom+" : pas de marché signé",s:"Créé par "+(ch.par||"Patrice")+" · "+jj(c.faits)+" ("+hh(c.h)+") chez "+clientOf(ch)+". Devis ou marché à faire."});
-    if(c.depasse>0)out.push({t:"r",ic:"+",h:ch.nom+" : "+jj(c.depasse)+" au-delà du contrat",s:"Jours pointés non couverts. Un avenant est à prévoir."});
-  });
-  var miss=[];for(var d=debutSuivi();d<TODAY;d=add(d,1))if(manque(d))miss.push(d);
-  if(miss.length)out.push({t:"a",ic:"?",h:miss.length+" jour"+(miss.length>1?"s":"")+" ouvré"+(miss.length>1?"s":"")+" à confirmer",s:"Depuis le "+fd(miss[0])+" · Patrice les remplit un par un (jours avec un ?)"});
-  S.lots.forEach(function(l){var s=R.lot[l.id], ch=chById(l.ch), e=etat(l);if(!ch)return;
-    if(e==="a")out.push({t:"a",ic:"€",h:ch.nom+" · "+lotName(l)+" terminé : à facturer",s:(s.au?"Terminé le "+fd(s.au)+" · ":"")+eur(montant(l).v)+" HT"});
-    else if(e==="c"&&s.faits>0)out.push({t:"b",ic:"€",h:ch.nom+" · "+lotName(l)+" : facture à préparer",s:jj(s.faits)+" sur "+jj(+l.jours)+(s.au?" · se termine le "+fd(s.au):"")});
-    if(e==="f")out.push({t:"b",ic:"€",h:ch.nom+" · "+(l.nf||lotName(l))+" : attente de paiement",s:"Facturé le "+fd(l.df)+" · échéance 45 j fin de mois : "+fdy(echeance(l.df))});
-    if(e==="r")out.push({t:"r",ic:"€",h:ch.nom+" · "+(l.nf||lotName(l))+" : paiement en retard",s:"Échéance dépassée depuis le "+fdy(echeance(l.df))});
-  });
-  series().forEach(function(x){var est=resaEstime(x);
-    out.push({t:"a",ic:"R",h:"Jours réservés sans contrat : "+resaNom(x),s:x.jours.length+" j du "+fd(x.jours[0])+" au "+fd(x.jours[x.jours.length-1])+" · "+resaClient(x)+(est!=null?" · ≈ "+eur(est):"")+" · devis ou contrat à préparer"});});
-  var g=donnees();
-  if(g>0)out.push({t:g>=5*JH?"r":"b",ic:"h",h:"Heures données : +"+hh(g)+" = "+jj(g/JH)+" gratuits",s:"Cumul sur les contrats au jour, au-delà des journées de "+JH+" h vendues"});
-  return out;
-}
 
 /* ---------------- état à envoyer ---------------- */
 function lotEtatTxt(l){var s=R.lot[l.id];
@@ -309,7 +289,7 @@ function activerNotif(){
 }
 
 /* ---------------- état d'interface ---------------- */
-var VIEW="lui", LT="cal", TAB="planning", LM=TODAY.slice(0,7), AM=TODAY.slice(0,7), MODE="ch", SH=null, RF="all", RO={f:true,h:false}, DELARM=null;
+var VIEW="lui", LT="cal", TAB="planning", LM=TODAY.slice(0,7), AM=TODAY.slice(0,7), MODE="ch", SH=null, RF="all", RO={f:true,h:false}, DELARM=null, OUV={};
 function monthDays(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7),n=new Date(Date.UTC(y,m,0)).getUTCDate(),a=[];for(var i=1;i<=n;i++)a.push(ym+"-"+pad(i));return a;}
 function shiftMonth(ym,k){var y=+ym.slice(0,4),m=+ym.slice(5,7)-1+k;y+=Math.floor(m/12);m=((m%12)+12)%12;return y+"-"+pad(m+1);}
 function monthLabel(ym){return MOIS[+ym.slice(5,7)-1]+" "+ym.slice(0,4);}
@@ -324,7 +304,7 @@ function squelette(){
     +(gestion?'<div class="vsw"><button data-view="moi" aria-pressed="true">Gestion</button><button data-view="lui" aria-pressed="false">Vue Patrice</button></div>':'')+'</header>'
     +'<div id="view-lui"'+(gestion?' class="stage cadre" hidden':'')+'><div class="app" id="app"><div class="appscroll" id="lui"></div>'
     +'<nav class="lnav" id="lnav"><button data-lt="cal" aria-pressed="true"><i></i>Calendrier</button><button data-lt="chs" aria-pressed="false"><i></i>Chantiers</button><button data-lt="cls" aria-pressed="false"><i></i>Clients</button></nav></div></div>'
-    +(gestion?'<div id="view-moi" class="stage"><div class="wide"><div class="tabs" id="tabs"><button data-tab="planning" aria-pressed="true">Planning</button><button data-tab="marches" aria-pressed="false">Clients, marchés &amp; avenants</button><button data-tab="heures" aria-pressed="false">Jours vendus / heures faites</button><button data-tab="rapport" aria-pressed="false">Rapport &amp; états</button></div><div id="moi"></div></div></div>':'');
+    +(gestion?'<div id="view-moi" class="stage"><div class="wide"><div class="tabs" id="tabs"><button data-tab="planning" aria-pressed="true">Planning</button><button data-tab="marches" aria-pressed="false">Clients, marchés &amp; avenants</button><button data-tab="rapport" aria-pressed="false">Rapport &amp; états</button></div><div id="moi"></div></div></div>':'');
   VIEW=gestion?"moi":"lui";
   majAttente();
 }
@@ -473,7 +453,7 @@ function openSheet(d,ctx){
   placeOv(ctx);renderSheet();
 }
 function openEtat(sel,ctx){SH={kind:"etat",sel:sel,ctx:ctx,o:{f:true,h:false}};placeOv(ctx);renderSheet();prepPDF().catch(function(){});}
-function openCl(ctx,id){SH={kind:"cl",ctx:ctx,id:id||null,err:""};placeOv(ctx);renderSheet();}
+function openCl(ctx,id){SH={kind:"cl",ctx:ctx,id:id||null,err:"",arme:false};placeOv(ctx);renderSheet();}
 function openPerso(ctx,id){var c=id?chById(id):null;
   SH={kind:"perso",ctx:ctx,id:id||null,err:"",arme:false,dr:c?{nom:c.nom,fixe:c.fixe,du:c.debut,au:c.fin||c.debut,j:c.jp||1,note:c.note}:{nom:"",fixe:false,du:TODAY,au:TODAY,j:1,note:""}};
   placeOv(ctx);renderSheet();}
@@ -531,7 +511,8 @@ function renderSheet(){
       +'<label class="full">Téléphone<input id="ncl-tel" inputmode="tel" value="'+esc(cl.tel||"")+'" placeholder="facultatif"></label>'
       +'<label class="full">Déplacement HT par jour (€) · mettre 0 si aucun<input id="ncl-dep" type="number" inputmode="decimal" min="0" step="1" value="'+(cl.dep==null?55:cl.dep)+'"></label></div>';
     if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
-    h+='<div class="shf"><button class="bs" data-act="close">Annuler</button><button class="bp" data-act="savecl">Enregistrer</button></div>';
+    if(SH.arme){var ncc=S.chantiers.filter(function(c){return c.client===SH.id;}).length;h+='<div class="err">'+(ncc?'Les '+ncc+' chantier'+(ncc>1?'s':'')+' de ce client, leurs contrats et leurs jours pointés ne seront plus visibles.':'Le client est retiré.')+'</div>';}
+    h+='<div class="shf">'+(SH.id?'<button class="bs danger" data-act="delcl">'+(SH.arme?"Confirmer la suppression":"Supprimer")+'</button>':'<button class="bs" data-act="close">Annuler</button>')+'<button class="bp" data-act="savecl">Enregistrer</button></div>';
   }
   else{
     var d=SH.d, e=R.days[d]||[], pv=e.filter(function(x){return x.kind==="prevu";});
@@ -640,7 +621,7 @@ function toast(t,s){var el=document.getElementById("toast");el.innerHTML="<b>"+e
 function renderMoi(){
   var el=document.getElementById("moi");if(!el)return;
   document.querySelectorAll("#tabs button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.tab===TAB?"true":"false");});
-  el.innerHTML=TAB==="planning"?tPlanning():TAB==="marches"?tMarches():TAB==="heures"?tHeures():tRapport();
+  el.innerHTML=TAB==="planning"?tPlanning():TAB==="marches"?tMarches():tRapport();
 }
 function barColor(c,l){if(c&&c.perso)return PERSO;if(MODE==="ch")return col(c);return l?STC[etat(l)]:STC.n;}
 function tPlanning(){
@@ -667,11 +648,7 @@ function tPlanning(){
   h+='</div></div><div class="cfoot">'
     +(MODE==="ch"?'Plein = fait (pointé par Patrice) · clair = prévu, recalculé en cascade à chaque saisie · rouge = sans marché ou hors contrat · clique un jour pour corriger'
       :['c','a','f','r','p'].map(function(k){return '<span class="badge b-'+k+'">'+STL[k]+'</span>';}).join(" ")+' · plein = fait, clair = prévu')+'</div></div>';
-  var al=alerts();
-  h+='<div class="side"><div class="card"><div class="chead"><h2>À regarder</h2><span class="badge '+(al.some(function(a){return a.t==="r";})?"b-r":al.length?"b-a":"b-p")+'">'+al.length+'</span></div><div class="alerts">';
-  al.forEach(function(a){h+='<div class="al '+a.t+'"><span class="ic">'+a.ic+'</span><div>'+esc(a.h)+'<small>'+esc(a.s)+'</small></div></div>';});
-  if(!al.length)h+='<div class="al"><div class="muted">Rien à signaler.</div></div>';
-  h+='</div></div><div class="card"><div class="chead"><h2>Chantiers</h2><span class="muted" style="font-size:12.5px">dans l\'ordre du planning</span></div>';
+  h+='<div class="side"><div class="card"><div class="chead"><h2>Chantiers</h2><span class="muted" style="font-size:12.5px">dans l\'ordre du planning</span></div>';
   chOrder().forEach(function(c){var r=R.ch[c.id];if(c.perso)return;
     var segs=lotsOf(c.id).map(function(l){var s=R.lot[l.id],cc=barColor(c,l),fa=Math.min(s.faits,l.jours);return '<i style="width:'+(r.total?fa/r.total*100:0)+'%;background:'+cc+'"></i><i style="width:'+(r.total?(l.jours-fa)/r.total*100:0)+'%;background:'+tint(cc)+'"></i>';}).join("");
     h+='<div class="chc"><div class="top"><span class="dot" style="background:'+col(c)+'"></span><span class="nm">'+esc(c.nom)+'</span><span class="cl" style="margin-left:auto">'+esc(clientOf(c))+'</span></div>';
@@ -690,42 +667,11 @@ function tPlanning(){
 
 function libFact(l){var e=etat(l);
   if(e==="p")return "payé le "+fd(l.dp);
-  if(e==="f"||e==="r")return (l.nf?l.nf+" · ":"")+"échéance "+fd(echeance(l.df));
+  if(e==="f"||e==="r")return (l.nf?(l.nf.length>22?l.nf.slice(0,22)+"…":l.nf)+" · ":"")+"échéance "+fd(echeance(l.df));
   if(e==="a")return "terminé, à facturer";
   return "facturé à la fin";}
 function tMarches(){
   var h="";
-  h+='<div class="card"><div class="chead"><h2>Clients</h2><span class="muted" style="font-size:12.5px">tarifs visibles et modifiables par Patrice</span><span class="sp"></span><button class="bsm" data-act="newcl2">+ Nouveau client</button></div>';
-  S.clients.forEach(function(cl){var n=S.chantiers.filter(function(c){return c.client===cl.id;}).length;
-    h+='<button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+(cl.dep?' · dépl. '+eur(cl.dep):'')+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button>';});
-  h+='</div>';
-  var sr=series();
-  if(sr.length){h+='<div class="card"><div class="chead"><h2>Jours réservés, sans contrat</h2><span class="muted" style="font-size:12.5px">notés à l\'avance par Patrice · à transformer en marché quand le devis est signé</span></div>';
-    sr.forEach(function(x){var est=resaEstime(x);
-      h+='<div class="li rs"><span class="li-t"><i class="key k5" style="margin-right:8px;vertical-align:-2px"></i>'+esc(resaNom(x))+'</span><span>'+esc(resaClient(x))+'</span><span class="muted">'+fd(x.jours[0])+' → '+fd(x.jours[x.jours.length-1])+' · '+jj(x.jours.length)+'</span><span class="muted">'+(est!=null?"≈ "+eur(est):"—")+'</span><button class="bsm pri" data-act="mkresa" data-serie="'+x.serie+'">Créer le marché</button></div>';});
-    h+='</div>';}
-  chOrder().forEach(function(c){if(c.perso)return;var r=R.ch[c.id], lots=lotsOf(c.id), cl=clById(c.client)||{mode:"jour",tarif:0};
-    var tm=lots.reduce(function(a,l){return a+montant(l).v;},0);
-    h+='<div class="card"><div class="chead"><span class="dot" style="background:'+col(c)+'"></span><h2>'+esc(c.nom)+'</h2><span class="muted">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span>'+(c.par&&c.par!=="Marine"?'<span class="badge b-a">créé par '+esc(c.par)+'</span>':'')+'<span class="sp"></span>'
-      +(function(){var dp=depCh(c);return dp.n?'<span class="resume">déplacements '+dp.n+' × '+eur(dp.pu)+' = <b>'+eur(dp.v)+'</b></span>':'';})()
-      +(r.sansMarche?'':'<span class="resume">'+jj(r.total)+' · <b>'+eur(tm)+'</b> · début '+fd(c.debut)+' · fin prévue <b>'+fd(r.fin)+'</b></span>')
-      +'<button class="bsm" data-act="editch" data-ch="'+c.id+'">Chantier</button></div>';
-    if(r.sansMarche){
-      h+='<div class="nolot"><span class="badge b-n">pas de marché signé</span><span>'+jj(r.faits)+' pointés ('+hh(r.h)+') · tarif client '+tarifTxt(cl.mode,cl.tarif)+'</span><span style="flex:1"></span><button class="bsm pri" data-act="mkmarche" data-ch="'+c.id+'">Créer le marché ('+jj(Math.max(1,Math.ceil(r.faits)))+')</button></div></div>';
-      return;}
-    h+='<div class="ct-h"><span>Contrat</span><span>Jours</span><span>Montant HT</span><span>Période</span><span>Fait</span><span>Facturation</span><span></span></div>';
-    lots.forEach(function(l){var s=R.lot[l.id], m=montant(l), e=etat(l), fa=Math.min(s.faits,l.jours);
-      h+='<button class="ct" data-act="editlot" data-lot="'+l.id+'">'
-        +'<span class="ct-n"><b>'+lotName(l)+'</b>'+(l.ref?'<small>'+esc(l.ref)+'</small>':'')+'</span>'
-        +'<span>'+jj(+l.jours)+'</span>'
-        +'<span><b>'+eur(m.v)+'</b>'+(m.est?'<small>estimé</small>':'')+'</span>'
-        +'<span class="muted">'+(s.du?fd(s.du)+' → '+fd(s.au):'—')+'</span>'
-        +'<span class="ct-f"><span class="mini"><i style="width:'+(fa/l.jours*100)+'%;background:'+col(c)+'"></i></span><small>'+jj(fa)+' / '+jj(+l.jours)+'</small></span>'
-        +'<span class="ct-s"><span class="badge b-'+e+'">'+STL[e]+'</span><small>'+esc(libFact(l))+'</small></span>'
-        +'<span class="go">›</span></button>';
-    });
-    h+='<div class="cfoot"><button class="bsm" data-act="addav" data-ch="'+c.id+'">+ Ajouter un avenant</button><span>Clique un contrat pour modifier ses jours, son montant ou sa facture.</span></div></div>';
-  });
   h+='<div class="card"><div class="chead"><h2>Nouveau marché</h2><span class="muted" style="font-size:12.5px">un chantier, un nombre de jours, une date de début · le tarif du client est repris</span></div><form class="form" id="fnew">'
     +'<label>Client<select id="n-client">'+S.clients.map(function(c){return '<option value="'+c.id+'">'+esc(c.nom)+' · '+tarifTxt(c.mode,c.tarif)+'</option>';}).join("")+'<option value="new">+ Nouveau client…</option></select></label>'
     +'<label>Nouveau client<input id="n-cnom" placeholder="si nouveau"></label>'
@@ -736,6 +682,39 @@ function tMarches(){
     +'<label>Jours<input type="number" id="n-jours" min="0.5" step="0.5" value="10"></label>'
     +'<label>Forfait HT (si connu)<input type="number" id="n-montant" min="0" step="1" placeholder="auto"></label>'
     +'<div class="act"><button class="bp" type="submit">Créer le marché</button></div></form></div>';
+  h+='<div class="card"><div class="chead"><h2>Clients</h2><span class="muted" style="font-size:12.5px">tarifs visibles et modifiables par Patrice</span><span class="sp"></span><button class="bsm" data-act="newcl2">+ Nouveau client</button></div>';
+  S.clients.forEach(function(cl){var n=S.chantiers.filter(function(c){return c.client===cl.id;}).length;
+    h+='<div class="rowact"><button class="li" data-act="editcl2" data-cl="'+cl.id+'"><span class="li-t">'+esc(cl.nom)+(cl.par&&cl.par!=="Marine"?' <span class="badge b-a">ajouté par '+esc(cl.par)+'</span>':'')+'</span><span>'+tarifTxt(cl.mode,cl.tarif)+(cl.dep?' · dépl. '+eur(cl.dep):'')+'</span><span class="muted">'+esc(cl.tel||"—")+'</span><span class="muted">'+n+' chantier'+(n>1?"s":"")+'</span><span class="go">›</span></button><span class="ra"><button class="bsm" data-act="editcl2" data-cl="'+cl.id+'">Modifier</button><button class="bsm danger" data-act="delcl0" data-cl="'+cl.id+'">Supprimer</button></span></div>';});
+  h+='</div>';
+  var sr=series();
+  if(sr.length){h+='<div class="card"><div class="chead"><h2>Jours réservés, sans contrat</h2><span class="muted" style="font-size:12.5px">notés à l\'avance par Patrice · à transformer en marché quand le devis est signé</span></div>';
+    sr.forEach(function(x){var est=resaEstime(x);
+      h+='<div class="li rs"><span class="li-t"><i class="key k5" style="margin-right:8px;vertical-align:-2px"></i>'+esc(resaNom(x))+'</span><span>'+esc(resaClient(x))+'</span><span class="muted">'+fd(x.jours[0])+' → '+fd(x.jours[x.jours.length-1])+' · '+jj(x.jours.length)+'</span><span class="muted">'+(est!=null?"≈ "+eur(est):"—")+'</span><button class="bsm pri" data-act="mkresa" data-serie="'+x.serie+'">Créer le marché</button></div>';});
+    h+='</div>';}
+  chOrder().forEach(function(c){if(c.perso)return;var r=R.ch[c.id], lots=lotsOf(c.id), cl=clById(c.client)||{mode:"jour",tarif:0};
+    var tm=lots.reduce(function(a,l){return a+montant(l).v;},0);
+    var ouv=!!OUV[c.id];
+    h+='<div class="card"><div class="chead"><button class="tg" data-act="tgch" data-ch="'+c.id+'" aria-expanded="'+ouv+'"><span class="chev">'+(ouv?'▾':'▸')+'</span><span class="dot" style="background:'+col(c)+'"></span><h2>'+esc(c.nom)+'</h2><span class="muted">'+esc(clientOf(c))+(c.ville?' · '+esc(c.ville):'')+'</span></button>'+(c.par&&c.par!=="Marine"?'<span class="badge b-a">créé par '+esc(c.par)+'</span>':'')+'<span class="sp"></span>'
+      +(function(){var dp=depCh(c);return dp.n?'<span class="resume">déplacements '+dp.n+' × '+eur(dp.pu)+' = <b>'+eur(dp.v)+'</b></span>':'';})()
+      +(r.sansMarche?'':'<span class="resume">'+jj(r.total)+' · <b>'+eur(tm)+'</b> · début '+fd(c.debut)+' · fin prévue <b>'+fd(r.fin)+'</b></span>')
+      +'<button class="bsm" data-act="editch" data-ch="'+c.id+'">Modifier</button><button class="bsm danger" data-act="delch0" data-ch="'+c.id+'">Supprimer</button></div>';
+    if(!ouv){h+='</div>';return;}
+    if(r.sansMarche){
+      h+='<div class="nolot"><span class="badge b-n">pas de marché signé</span><span>'+jj(r.faits)+' pointés ('+hh(r.h)+') · tarif client '+tarifTxt(cl.mode,cl.tarif)+'</span><span style="flex:1"></span><button class="bsm pri" data-act="mkmarche" data-ch="'+c.id+'">Créer le marché ('+jj(Math.max(1,Math.ceil(r.faits)))+')</button></div></div>';
+      return;}
+    h+='<div class="rowact"><div class="ct-h"><span>Contrat</span><span>Jours</span><span>Montant HT</span><span>Période</span><span>Fait</span><span>Facturation</span><span></span></div><span class="ra"></span></div>';
+    lots.forEach(function(l){var s=R.lot[l.id], m=montant(l), e=etat(l), fa=Math.min(s.faits,l.jours);
+      h+='<div class="rowact"><button class="ct" data-act="editlot" data-lot="'+l.id+'">'
+        +'<span class="ct-n"><b>'+lotName(l)+'</b>'+(l.ref?'<small>'+esc(l.ref)+'</small>':'')+'</span>'
+        +'<span>'+jj(+l.jours)+'</span>'
+        +'<span><b>'+eur(m.v)+'</b>'+(m.est?'<small>estimé</small>':'')+'</span>'
+        +'<span class="muted">'+(s.du?fd(s.du)+' → '+fd(s.au):'—')+'</span>'
+        +'<span class="ct-f"><span class="mini"><i style="width:'+(fa/l.jours*100)+'%;background:'+col(c)+'"></i></span><small>'+jj(fa)+' / '+jj(+l.jours)+'</small></span>'
+        +'<span class="ct-s"><span class="badge b-'+e+'">'+STL[e]+'</span><small>'+esc(libFact(l))+'</small></span>'
+        +'<span class="go">›</span></button><span class="ra"><button class="bsm" data-act="editlot" data-lot="'+l.id+'">Modifier</button><button class="bsm danger" data-act="dellot0" data-lot="'+l.id+'">Supprimer</button></span></div>';
+    });
+    h+='<div class="cfoot"><button class="bsm" data-act="addav" data-ch="'+c.id+'">+ Ajouter un avenant</button><span>Clique un contrat pour modifier ses jours, son montant ou sa facture.</span></div></div>';
+  });
   return h;
 }
 
@@ -781,33 +760,8 @@ function feuilleCh(){
     +'<label>Début<input id="ch-debut" type="date" value="'+c.debut+'"></label>'
     +'<label class="full">Adresse<input id="ch-adresse" value="'+esc(c.adresse)+'"></label></div>';
   if(SH.err)h+='<div class="err">'+esc(SH.err)+'</div>';
-  h+='<div class="shf"><button class="bs" data-act="close">Annuler</button><button class="bp" data-act="savech">Enregistrer</button></div>';
-  return h;
-}
-
-function tHeures(){
-  var h='<div class="card"><div class="chead"><h2>Jours vendus et heures réellement faites</h2><span class="muted" style="font-size:12.5px">journée vendue = '+JH+' h · jours pointés dans l\'outil (hors reprise)</span></div><div class="tw"><table><thead><tr>'
-    +'<th class="l">Chantier · contrat</th><th>Jours pointés</th><th>Heures vendues</th><th>Heures faites</th><th>Écart</th><th>Jours gratuits</th><th>€ / h prévu</th><th>€ / h réel</th></tr></thead><tbody>';
-  var T={j:0,hv:0,hf:0,g:0}, any=false;
-  chOrder().forEach(function(c){lotsOf(c.id).forEach(function(l){var s=R.lot[l.id], fj=s.faits-s.reprise, fh=s.h-s.reprise*JH;if(fj<=1e-9)return;any=true;
-    var hv=fj*JH, ec=fh-hv, jour=l.mode==="jour", pj=montant(l).v/l.jours;T.j+=fj;T.hv+=hv;T.hf+=fh;if(jour)T.g+=ec;
-    h+='<tr><td class="l"><span class="dot" style="background:'+col(c)+';margin-right:7px;width:10px;height:10px"></span><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+esc(clientOf(c))+' · '+(jour?eur(pj)+" / jour":tarifTxt(l.mode,l.prix))+'</span></td>'
-      +'<td>'+jj(fj)+'</td><td>'+hh(hv)+'</td><td><b>'+hh(fh)+'</b><span class="ps">'+hh(fh/fj)+' / jour</span></td>'
-      +'<td class="'+(ec>0.01&&jour?"pos":"")+'">'+(ec>0?"+ ":ec<0?"− ":"")+hh(Math.abs(ec))+'</td>'
-      +'<td>'+(!jour?'<span class="muted">payé à l\'heure</span>':ec>0.01?'<b style="color:var(--red)">'+jj(ec/JH)+'</b>':'—')+'</td>'
-      +'<td>'+(jour?(pj/JH).toFixed(2).replace(".",","):l.prix.toFixed(2).replace(".",","))+' €</td><td><b>'+(jour?(fj*pj/fh).toFixed(2).replace(".",","):l.prix.toFixed(2).replace(".",","))+' €</b></td></tr>';
-  });});
-  if(!any)h+='<tr><td class="l muted" colspan="8">Rien encore : le tableau se remplit dès que Patrice note ses journées.</td></tr>';
-  else h+='<tr class="tot"><td class="l">Total</td><td>'+jj(T.j)+'</td><td>'+hh(T.hv)+'</td><td>'+hh(T.hf)+'</td><td></td><td style="color:var(--red)">'+jj(T.g/JH)+'<span class="ps">soit '+hh(T.g)+'</span></td><td></td><td></td></tr>';
-  h+='</tbody></table></div>';
-  h+='<div class="expl"><div><b>Ce qui est facturé</b>Au jour ou au forfait : le montant du marché, quelles que soient les heures. À l\'heure : les heures réellement faites.</div>'
-    +'<div><b>Ce qui est suivi en plus</b>Une journée de 10 h vendue '+JH+' h, c\'est '+(10-JH)+' h données. L\'outil les additionne et les traduit en jours gratuits. Patrice voit ce compteur dans ses chantiers.</div>'
-    +'<div><b>À quoi ça sert</b>Le € / h réel montre ce que la journée rapporte vraiment. Les jours gratuits servent d\'argument pour un avenant ou pour le prix du prochain marché.</div></div></div>';
-  var mo={};Object.keys(S.P).forEach(function(d){var p=S.P[d];if(!p.it)return;var tr=p.it.filter(function(i){return !estPerso(i.ch);});if(!tr.length)return;var k=d.slice(0,7);mo[k]=mo[k]||{j:0,h:0};mo[k].j++;tr.forEach(function(i){mo[k].h+=(+i.h);});});
-  var ks=Object.keys(mo).sort();
-  if(ks.length){h+='<div class="card"><div class="chead"><h2>Par mois</h2><span class="muted" style="font-size:12.5px">tous chantiers confondus</span></div><div class="tw"><table><thead><tr><th class="l">Mois</th><th>Jours travaillés</th><th>Heures faites</th><th>Base '+JH+' h / jour</th><th>Écart</th><th>Moyenne / jour</th></tr></thead><tbody>';
-    ks.forEach(function(k){var m=mo[k],b=m.j*JH;h+='<tr><td class="l" style="text-transform:capitalize">'+monthLabel(k)+'</td><td>'+m.j+'</td><td>'+hh(m.h)+'</td><td>'+hh(b)+'</td><td class="'+(m.h-b>0?"pos":"")+'">'+(m.h-b>0?"+ ":"")+hh(m.h-b)+'</td><td>'+hh(m.h/m.j)+'</td></tr>';});
-    h+='</tbody></table></div></div>';}
+  if(SH.arme){var nl=lotsOf(c.id).length;h+='<div class="err">'+(nl?'Le chantier et ses '+nl+' contrat'+(nl>1?'s':'')+' sont retirés. Les jours déjà pointés ne seront plus comptés.':'Le chantier est retiré.')+'</div>';}
+  h+='<div class="shf"><button class="bs danger" data-act="delch">'+(SH.arme?"Confirmer la suppression":"Supprimer")+'</button><button class="bp" data-act="savech">Enregistrer</button></div>';
   return h;
 }
 
@@ -829,14 +783,14 @@ function tRapport(){
   }
   S.clients.forEach(function(cl){var cc=chs.filter(function(c){return c.client===cl.id;});if(!cc.length)return;
     var t={m:0,f:0,p:0};
-    h+='<div class="card"><div class="chead"><h2>'+esc(cl.nom)+'</h2><span class="muted" style="font-size:12.5px">'+tarifTxt(cl.mode,cl.tarif)+'</span></div><table class="fit"><thead><tr><th class="l">Chantier · contrat</th><th>Montant</th><th>Fait</th><th class="l">Facturation</th><th>Reste à facturer</th><th>Reste à encaisser</th></tr></thead><tbody>';
+    h+='<div class="card"><div class="chead"><h2>'+esc(cl.nom)+'</h2><span class="muted" style="font-size:12.5px">'+tarifTxt(cl.mode,cl.tarif)+'</span></div><table class="fit"><thead><tr><th class="l">Chantier · contrat</th><th>Montant</th><th>Fait</th><th class="l">Facturation</th><th>Reste à facturer</th><th>Reste à encaisser</th><th>Payé</th></tr></thead><tbody>';
     cc.forEach(function(c){var r=R.ch[c.id];
-      if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché<span class="ps">'+jj(r.faits)+' · '+hh(r.h)+(depCh(c).n?' · déplacements '+depCh(c).n+' × '+eur(depCh(c).pu)+' = '+eur(depCh(c).v):'')+'</span></td><td>—</td><td>—</td><td class="l"><span class="badge b-n">devis à faire</span></td><td>—</td><td>—</td></tr>';return;}
+      if(r.sansMarche){h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · sans marché<span class="ps">'+jj(r.faits)+' · '+hh(r.h)+(depCh(c).n?' · déplacements '+depCh(c).n+' × '+eur(depCh(c).pu)+' = '+eur(depCh(c).v):'')+'</span></td><td>—</td><td>—</td><td class="l"><span class="badge b-n">devis à faire</span></td><td>—</td><td>—</td><td></td></tr>';return;}
       lotsOf(c.id).forEach(function(l){var s=R.lot[l.id],mm=montant(l),m=mm.v,f=l.st!=="a"?m:0,p=l.st==="p"?m:0,e=etat(l);t.m+=m;t.f+=f;t.p+=p;
       h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · '+lotName(l)+'<span class="ps">'+jj(+l.jours)+(s.du?' · '+fd(s.du)+' → '+fd(s.au):'')+'</span></td><td>'+eur(m)+(mm.est?'<span class="ps">estimé</span>':'')+'</td><td>'+Math.round(Math.min(s.faits,l.jours)/l.jours*100)+' %</td>'
-        +'<td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span><span class="ps">'+esc(libFact(l))+'</span></td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td></tr>';});
-      var dpr=depCh(c);if(dpr.n)h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · Déplacements<span class="ps">'+dpr.n+' × '+eur(dpr.pu)+'</span></td><td>'+eur(dpr.v)+'</td><td></td><td class="l"><span class="ps">en plus du marché, à ajouter à la facture</span></td><td></td><td></td></tr>';});
-    h+='<tr class="tot"><td class="l">Total</td><td>'+eur(t.m)+'</td><td></td><td class="l">facturé '+eur(t.f)+' · encaissé '+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td></tr></tbody></table></div>';
+        +'<td class="l"><span class="badge b-'+e+'">'+STL[e]+'</span><span class="ps">'+esc(libFact(l))+'</span></td><td>'+(m-f?eur(m-f):'—')+'</td><td>'+(f-p?eur(f-p):'—')+'</td><td><button class="paye" data-act="paye" data-lot="'+l.id+'" aria-pressed="'+(l.st==="p")+'" aria-label="Payé : '+esc(c.nom)+' '+lotName(l)+'"><span class="box">'+(l.st==="p"?"✓":"")+'</span></button></td></tr>';});
+      var dpr=depCh(c);if(dpr.n)h+='<tr><td class="l"><b>'+esc(c.nom)+'</b> · Déplacements<span class="ps">'+dpr.n+' × '+eur(dpr.pu)+'</span></td><td>'+eur(dpr.v)+'</td><td></td><td class="l"><span class="ps">en plus du marché, à ajouter à la facture</span></td><td></td><td></td><td></td></tr>';});
+    h+='<tr class="tot"><td class="l">Total</td><td>'+eur(t.m)+'</td><td></td><td class="l">facturé '+eur(t.f)+' · encaissé '+eur(t.p)+'</td><td>'+eur(t.m-t.f)+'</td><td>'+eur(t.f-t.p)+'</td><td></td></tr></tbody></table></div>';
   });
   var gch=chOrder().filter(function(c){return ids.indexOf(c.id)>=0&&R.ch[c.id].fin;});
   if(gch.length){
@@ -863,7 +817,7 @@ function renderAll(){compute();renderLui();renderMoi();}
 
 document.addEventListener("click",function(e){
   var v=e.target.closest("[data-view]");if(v){setView(v.dataset.view);return;}
-  var t=e.target.closest("#tabs button[data-tab]");if(t){TAB=t.dataset.tab;DELARM=null;renderMoi();return;}
+  var t=e.target.closest("#tabs button[data-tab]");if(t){TAB=t.dataset.tab;DELARM=null;OUV={};renderMoi();return;}
   var n=e.target.closest("#lnav button[data-lt]");if(n){LT=n.dataset.lt;renderLui();window.scrollTo(0,0);var sc=document.getElementById("lui");if(sc)sc.scrollTop=0;return;}
   if(e.target.id==="ov"){closeSheet();return;}
   var b=e.target.closest("[data-act]");if(!b)return;
@@ -890,7 +844,7 @@ document.addEventListener("click",function(e){
   if(!SH&&a==="dellot"){if(DELARM!==b.dataset.lot){DELARM=b.dataset.lot;return renderMoi();}
     var id=b.dataset.lot;S.lots=S.lots.filter(function(l){return l.id!==id;});DELARM=null;pousser("prtech_contrat_supprimer",{p_jeton:JETON,p_id:id});return renderAll();}
   if(a==="editlot"){var lo=lotById(b.dataset.lot);SH={kind:"lot",ctx:"moi",id:lo.id,dr:JSON.parse(JSON.stringify(lo)),err:"",arme:false};placeOv("moi");return renderSheet();}
-  if(a==="editch"){SH={kind:"ch",ctx:"moi",id:b.dataset.ch,err:""};placeOv("moi");return renderSheet();}
+  if(a==="editch"){SH={kind:"ch",ctx:"moi",id:b.dataset.ch,err:"",arme:false};placeOv("moi");return renderSheet();}
   if(a==="editcl2")return openCl("moi",b.dataset.cl);
   if(a==="newperso")return openPerso(b.closest("#moi")?"moi":"lui",null);
   if(a==="editperso")return openPerso(b.closest("#moi")?"moi":"lui",b.dataset.ch);
@@ -902,6 +856,13 @@ document.addEventListener("click",function(e){
     S.lots.push(nlo);sLot(nlo);g.jours.forEach(function(k){delete S.V[k];});dPrev(g.jours);
     compute();toast("Marché créé : "+nch.nom,g.jours.length+" jours à partir du "+fd(g.jours[0])+". Ajuste les jours et le montant d'après le devis.");return renderAll();}
   if(a==="newcl2")return openCl("moi",null);
+  if(!SH&&a==="delcl0"){openCl("moi",b.dataset.cl);SH.arme=true;return renderSheet();}
+  if(!SH&&a==="delch0"){SH={kind:"ch",ctx:"moi",id:b.dataset.ch,err:"",arme:true};placeOv("moi");return renderSheet();}
+  if(!SH&&a==="dellot0"){var lz=lotById(b.dataset.lot);SH={kind:"lot",ctx:"moi",id:lz.id,dr:JSON.parse(JSON.stringify(lz)),err:"",arme:true};placeOv("moi");return renderSheet();}
+  if(!SH&&a==="tgch"){OUV[b.dataset.ch]=!OUV[b.dataset.ch];return renderMoi();}
+  if(!SH&&a==="paye"){var lp=lotById(b.dataset.lot);if(!lp)return;
+    if(lp.st==="p"){lp.st="f";lp.dp="";}else{lp.st="p";if(!lp.df)lp.df=TODAY;if(!lp.dp)lp.dp=TODAY;}
+    sLot(lp);compute();toast(lp.st==="p"?"Payé : "+chById(lp.ch).nom+" · "+lotName(lp):"Paiement retiré : "+chById(lp.ch).nom+" · "+lotName(lp),lp.st==="p"?"Encaissé, tous les onglets sont à jour":"Remis en attente de paiement");return renderAll();}
   if(!SH)return;
   if(a==="close")return closeSheet();
   if(a==="eopt"){SH.o[b.dataset.k]=!SH.o[b.dataset.k];return renderSheet();}
@@ -921,6 +882,16 @@ document.addEventListener("click",function(e){
     if(!db3){SH.err="Indique la date de début.";return renderSheet();}
     var bfc=finsSnapshot();c3.nom=nm3;c3.court=val("ch-court");c3.client=val("ch-client")||c3.client;c3.ville=val("ch-ville");c3.debut=db3;c3.adresse=val("ch-adresse");
     sChantier(c3);return finish(bfc,c3.nom+" enregistré");}
+  if(a==="delcl"){if(!SH.arme){SH.arme=true;return renderSheet();}
+    var idc=SH.id,bfk=finsSnapshot();
+    S.chantiers.filter(function(c){return c.client===idc;}).forEach(function(c){S.lots.filter(function(l){return l.ch===c.id;}).forEach(function(l){pousser("prtech_contrat_supprimer",{p_jeton:JETON,p_id:l.id});});c.archive=true;sChantier(c);});
+    S.lots=S.lots.filter(function(l){return chById(l.ch)&&chById(l.ch).client!==idc;});S.chantiers=S.chantiers.filter(function(c){return c.client!==idc;});
+    S.clients=S.clients.filter(function(c){return c.id!==idc;});dClient(idc);return finish(bfk,"Client supprimé");}
+  if(a==="delch"){if(!SH.arme){SH.arme=true;return renderSheet();}
+    var idh=SH.id,chh=chById(idh),bfh=finsSnapshot();
+    S.lots.filter(function(l){return l.ch===idh;}).forEach(function(l){pousser("prtech_contrat_supprimer",{p_jeton:JETON,p_id:l.id});});
+    chh.archive=true;sChantier(chh);S.lots=S.lots.filter(function(l){return l.ch!==idh;});S.chantiers=S.chantiers.filter(function(c){return c.id!==idh;});
+    return finish(bfh,"Chantier supprimé : "+chh.nom);}
   if(a==="savecl"){var nom=val("ncl-nom");if(!nom){SH.err="Donne un nom au client.";return renderSheet();}
     var edit=!!SH.id, c0=edit?clById(SH.id):{id:uid(),par:MOI.nom};
     c0.nom=nom;c0.mode=val("ncl-mode")||"jour";c0.tarif=parseFloat(val("ncl-tarif").replace(",","."))||0;c0.tel=val("ncl-tel");c0.dep=parseFloat(val("ncl-dep").replace(",","."))||0;
@@ -1033,7 +1004,7 @@ function demarrer(){
   var q=new URLSearchParams(location.search), k=q.get("k"), o=q.get("onglet");
   if(k&&/^[0-9a-f-]{36}$/i.test(k)){JETON=k;lsSet("prtech_jeton",k);}
   // Lien direct depuis la tour de contrôle AP2M : ?onglet=marches ouvre la gestion sur cet onglet
-  if(o&&/^(planning|marches|heures|rapport)$/.test(o))TAB=o;
+  if(o&&/^(planning|marches|rapport)$/.test(o))TAB=o;
   if(k||o)history.replaceState(null,"",location.pathname);
   // Une nouvelle version de l'appli prend la main : la page se recharge seule (sauf saisie en cours).
   if("serviceWorker" in navigator){
